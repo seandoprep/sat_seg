@@ -1,0 +1,169 @@
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
+import numpy as np
+import albumentations as A
+from typing import Any
+from glob import glob
+from PIL import Image
+from albumentations.pytorch import ToTensorV2
+from torch.utils.data import Dataset, DataLoader
+
+
+class CustomDataset(Dataset):
+    def __init__(
+        self,
+        data_dir: str = None,
+        transformations: A.Compose = None,
+        pre_split: bool = False,
+        split: str = "train",
+        val_ratio: int = 0.2,
+        channel_num: int = 3
+    ) -> None:
+        if not os.path.exists(data_dir):
+            raise ValueError(f'Provided data_dir: "{data_dir}" does not exist.')
+
+        np.random.seed(42)
+        
+        self.data_dir = data_dir
+        self.image_dir = os.path.join(data_dir, "Image")
+        self.mask_dir = os.path.join(data_dir, "Mask")
+        self.image_filenames = sorted(glob(os.path.join(self.image_dir, "*.png")))
+        self.mask_filenames = sorted(glob(os.path.join(self.mask_dir, "*.png")))
+        self.transformations = transformations
+        self.split = split
+        self.pre_split = pre_split
+        self.val_ratio = val_ratio
+        self.channel_num = channel_num
+
+        num_samples = len(self.image_filenames)
+
+        indices = list(range(num_samples))
+
+        if not self.pre_split:
+            np.random.shuffle(indices)
+            num_val_samples = int(self.val_ratio * num_samples)
+            if self.split == "train":
+                self.indices = indices[:-num_val_samples]
+            elif self.split == "val":
+                self.indices = indices[-num_val_samples:]
+            else:
+                raise ValueError("Invalid split value. Use 'train' or 'val'.")
+        else:
+            self.indices = indices
+
+    def __len__(self) -> int:
+        return len(self.indices)
+
+    def __getitem__(self, idx: Any) -> Any:
+        img_idx = self.indices[idx]
+        img_name = self.image_filenames[img_idx]
+        mask_name = self.mask_filenames[img_idx]
+
+        
+        if self.channel_num == 3:
+            image = np.array(Image.open(img_name).convert("RGB"), dtype=np.float32)
+        elif self.channel_num == 1:
+            image = np.array(Image.open(img_name).convert("L"), dtype=np.float32)       
+            image = np.stack((image, image, image), axis=2)      
+        else:
+            raise ValueError("Only images with only one or three channels are available so far")
+
+        mask = np.array(Image.open(mask_name).convert("L"), dtype=np.float32)
+
+        image = image / 255.0
+        mask = mask / 255.0
+
+        if self.transformations is not None:
+            augmentations = self.transformations(image=image, mask=mask)
+            image = augmentations["image"]
+            mask = augmentations["mask"]
+
+        mask = np.expand_dims(mask, axis=0)
+
+        return image, mask
+
+
+class EvalDataset(Dataset):
+    def __init__(self, data_dir: str, transformations: A.Compose = None, channel_num : int = 3) -> None:
+        if not os.path.exists(data_dir):
+            return ValueError(f'Provided data_dir: "{data_dir}" does not exist.')
+
+        self.data_dir = data_dir
+        self.image_dir = os.path.join(data_dir, "Image")
+        self.mask_dir = os.path.join(data_dir, "Mask")
+        self.image_filenames = sorted(glob(os.path.join(self.image_dir, "*.png")))
+        self.mask_filenames = sorted(glob(os.path.join(self.mask_dir, "*.png")))
+        self.transformations = transformations
+        self.channel_num = channel_num
+
+    def __len__(self) -> int:
+        return len(self.image_filenames)
+
+    def __getitem__(self, idx: Any) -> Any:
+        img_name = self.image_filenames[idx]
+        mask_name = self.mask_filenames[idx]
+
+        if self.channel_num == 3:
+            image = np.array(Image.open(img_name).convert("RGB"), dtype=np.float32)
+        elif self.channel_num == 1:
+            image = np.array(Image.open(img_name).convert("L"), dtype=np.float32)       
+            image = np.stack((image, image, image), axis=2)      
+        else:
+            raise ValueError("Only images with only one or three channels are available so far")
+        
+        mask = np.array(Image.open(mask_name).convert("L"), dtype=np.float32)
+
+        image = image / 255.0
+        mask = mask / 255.0
+
+        if self.transformations is not None:
+            augmentations = self.transformations(image=image, mask=mask)
+            image = augmentations["image"]
+            mask = augmentations["mask"]
+
+        mask = np.expand_dims(mask, axis=0)
+
+        return image, mask
+
+
+if __name__ == "__main__":
+    data_dir = "./data"
+    input_size = (256, 256)
+
+    train_transform = A.Compose(
+        [
+            A.Resize(input_size[0], input_size[1]),
+            ToTensorV2(),
+        ]
+    )
+
+    val_transform = A.Compose(
+        [
+            A.Resize(input_size[0], input_size[1]),
+            ToTensorV2(),
+        ]
+    )
+
+    # Train dataset with defining split
+    #train_dataset = CustomDataset(data_dir, transformations=train_transform, split="train")
+    #train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
+
+    # Validation dataset with defining split
+    #val_dataset = CustomDataset(data_dir, transformations=val_transform, split="val")
+    #val_dataloader = DataLoader(val_dataset, batch_size=4, shuffle=False)
+
+    # for images, masks in train_dataloader:
+    #     # Use the train data here for training
+    #     print(f"Image: {images.shape}")
+    #     print(f"Mask: {masks.shape}")
+
+    # Train dataset with pre-split
+    split_train = CustomDataset(data_dir="./data/Train", pre_split=True)
+    split_train_loader = DataLoader(split_train, batch_size=4, shuffle=False)
+
+    # Test dataset with pre-split
+    split_test = CustomDataset(data_dir="./data/Val", pre_split=True)
+    split_test_loader = DataLoader(split_train, batch_size=4, shuffle=False)
+
+    print(split_train.__len__())
+    print(split_test.__len__())
