@@ -6,6 +6,10 @@ import numpy as np
 import pandas as pd
 import cv2
 import matplotlib.pyplot as plt
+import spectral
+import spectral.io.envi as envi 
+
+from glob import glob
 from typing import Any
 
 SMOOTH = 1e-8
@@ -139,3 +143,53 @@ def gpu_test():
         print('CUDA is currently available')
     else: 
         print('CUDA is currently unavailable')
+
+
+# Pad and Crop 
+def pad_crop(original_array : np.ndarray, split_size : int):
+    
+    original_channel, original_height, original_width = original_array.shape
+
+    # Padding 
+    X_num = (original_width - split_size) // split_size + 1
+    Y_num = (original_height - split_size) // split_size + 1
+
+    pad_x = (split_size * (X_num) + split_size) - original_width
+    pad_y = (split_size * (Y_num) + split_size) - original_height
+
+    padded_array = np.pad(original_array, ((0,0),(0,pad_y),(0,pad_x)), 'constant', constant_values=0)
+    _, padded_height, padded_width = padded_array.shape
+
+    stride_height = padded_height // split_size
+    stride_width = padded_width // split_size
+
+    # Cropping
+    cropped_images = []
+    for i in range(stride_height):
+        for j in range(stride_width):
+            start_x = i * split_size
+            start_y = j * split_size
+            end_x = start_x + split_size
+            end_y = start_y + split_size
+
+            cropped_image = padded_array[start_x:end_x, start_y:end_y, :]
+            cropped_images.append(cropped_image)
+
+    return np.array(cropped_images)
+
+
+def read_envi_file(img_path):
+    hdr_files = sorted(glob(os.path.join(img_path, "*.hdr")))
+    img_files = sorted(glob(os.path.join(img_path, "*.img")))
+    band_nums = len(hdr_files)
+
+    envi_data = []
+    for i in range(band_nums):
+        envi_hdr_path = hdr_files[i]
+        envi_img_path = img_files[i]
+
+        data = envi.open(envi_hdr_path, envi_img_path)
+        img = np.array(data.load())[:,:,0]
+        envi_data.append(img)
+
+    return np.array(envi_data)

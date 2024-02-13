@@ -5,22 +5,21 @@ import csv
 import sys
 import click
 import traceback
-import albumentations as A
 import torch
 import torch.optim as optim
-from albumentations.pytorch import ToTensorV2
+
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from dataset import CustomDataset
+from dataset import SatelliteDataset
 from models.deeplabv3plus import DeepLabV3Plus
 from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
 from models.transunet import TransUNet
 from loss import DiceLoss
-from utils import visualize_training_log, calculate_metrics
+from utils import visualize_training_log, calculate_metrics, gpu_test
 from datetime import datetime
 
-INPUT_CHANNEL_NUM = 1 
+INPUT_CHANNEL_NUM = 3
 INPUT = (256, 256)
 CLASSES = 1  # For Binary Segmentatoin
 
@@ -52,22 +51,8 @@ CLASSES = 1  # For Binary Segmentatoin
     "-B",
     "--batch-size",
     type=int,
-    default=4,
-    help="Batch size of data for training. Default - 4",
-)
-@click.option(
-    "-P",
-    "--pre-split",
-    required=True,
-    type=bool,
-    help="Opt-in to split data into Training and Validaton set.",
-)
-@click.option(
-    "-A",
-    "--augment",
-    type=bool,
-    default=True,
-    help="Opt-in to apply augmentations to training set. Default - True",
+    default=8,
+    help="Batch size of data for training. Default - 8",
 )
 @click.option(
     "-S",
@@ -82,8 +67,6 @@ def main(
     num_epochs: int,
     learning_rate: float,
     batch_size: int,
-    pre_split: bool,
-    augment: bool,
     early_stop: bool,
 ) -> None:
     """
@@ -95,59 +78,14 @@ def main(
     """
     click.secho(message="🚀 Training...", fg="blue", nl=True)
 
-    train_transform_list = [
-        A.Resize(INPUT[0], INPUT[1]),
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2(),
-    ]
-
-    val_transform_list = [
-        A.Resize(INPUT[0], INPUT[1]),
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ToTensorV2(),
-    ]
-
-    if augment:
-        train_transform_list = (
-            train_transform_list[:1]
-            + [
-                A.Rotate(limit=(-10, 10), p=0.7),
-                A.HorizontalFlip(p=0.5),
-                A.VerticalFlip(p=0.5),
-                A.RandomCrop(height=INPUT[0], width=INPUT[0], p=0.7),
-            ]
-            + train_transform_list[1:]
-        )
-    else:
-        pass
-
-    train_transform = A.Compose(transforms=train_transform_list, is_check_shapes=False)
-    val_transform = A.Compose(transforms=val_transform_list, is_check_shapes=False)
 
     try:
-        if pre_split:
-            train_dataset = CustomDataset(
-                data_dir=os.path.join(data_dir, "Train"),
-                transformations=train_transform,
-                pre_split=True,
-                channel_num = INPUT_CHANNEL_NUM
-
-            )
-            val_dataset = CustomDataset(
-                data_dir=os.path.join(data_dir, "Val"),
-                transformations=val_transform,
-                pre_split=True,
-                channel_num = INPUT_CHANNEL_NUM
-            )
-        else:
-            train_dataset = CustomDataset(
-                data_dir=data_dir, transformations=train_transform, split="train",
-                channel_num = INPUT_CHANNEL_NUM
-            )
-            val_dataset = CustomDataset(
-                data_dir=data_dir, transformations=val_transform, split="val",
-                channel_num = INPUT_CHANNEL_NUM
-            )
+        train_dataset = SatelliteDataset(
+            data_dir=data_dir, split="train", transform=True
+        )
+        val_dataset = SatelliteDataset(
+            data_dir=data_dir, split="val", transform=True
+        )
     except Exception as _:
         click.secho(message="\n❗ Error \n", fg="red")
         click.secho(message=traceback.format_exc(), fg="yellow")
@@ -166,14 +104,15 @@ def main(
     elif model_name == 'transunet':
         model = TransUNet(256, 3, 128, 4, 512, 8, 16, CLASSES)  # Can handle 1, 3 channel img data
     
-
+    # Check GPU Availability
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    gpu_test()
+    
+    # Train Setting
     model.to(device)
 
     criterion = DiceLoss()
-
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-6)
-
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", patience=3, factor=0.1, verbose=True
     )

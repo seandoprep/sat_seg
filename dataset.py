@@ -1,131 +1,86 @@
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import numpy as np
-import albumentations as A
-from typing import Any
-from glob import glob
-from PIL import Image
-from albumentations.pytorch import ToTensorV2
-from torch.utils.data import Dataset, DataLoader
+import torchvision.transforms as transforms
 
-class CustomDataset(Dataset):
+from typing import Any
+from torch.utils.data import Dataset
+from utils import pad_crop, read_envi_file
+
+
+class SatelliteDataset(Dataset):
     def __init__(
         self,
         data_dir: str = None,
-        transformations: A.Compose = None,
-        pre_split: bool = False,
         split: str = "train",
-        val_ratio: int = 0.2,
-        channel_num: int = 3
+        val_ratio: float = 0.2,
+        test_ratio: float = 0.1,
+        transform : bool = True,
     ) -> None:
         if not os.path.exists(data_dir):
             raise ValueError(f'Provided data_dir: "{data_dir}" does not exist.')
-
-        np.random.seed(42)
         
         self.data_dir = data_dir
         self.image_dir = os.path.join(data_dir, "Image")
         self.mask_dir = os.path.join(data_dir, "Mask")
-        self.image_filenames = sorted(glob(os.path.join(self.image_dir, "*.png")))
-        self.mask_filenames = sorted(glob(os.path.join(self.mask_dir, "*.png")))
-        self.transformations = transformations
+        self.image_list = pad_crop(read_envi_file(self.image_dir), 224)
+        self.mask_list = pad_crop(read_envi_file(self.mask_dir), 224)
         self.split = split
-        self.pre_split = pre_split
         self.val_ratio = val_ratio
-        self.channel_num = channel_num
+        self.test_ratio = test_ratio
+        self.transform = transform
+        self.custom_transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomRotation(10),
+        ])
 
-        num_samples = len(self.image_filenames)
-
+        num_samples = len(self.image_list)
         indices = list(range(num_samples))
 
-        if not self.pre_split:
-            np.random.shuffle(indices)
-            num_val_samples = int(self.val_ratio * num_samples)
-            if self.split == "train":
-                self.indices = indices[:-num_val_samples]
-            elif self.split == "val":
-                self.indices = indices[-num_val_samples:]
-            else:
-                raise ValueError("Invalid split value. Use 'train' or 'val'.")
+        # Data Split
+        np.random.seed(42)
+        np.random.shuffle(indices)
+        num_val_samples = int(self.val_ratio * num_samples)
+        num_test_sampels = int(self.test_ratio * num_samples)
+        if self.split == "train":
+            self.indices = indices[:-num_val_samples]
+        elif self.split == "val":
+            self.indices = indices[-num_val_samples:-num_test_sampels]
+        elif self.split == 'test':
+            self.indices = indices[-num_test_sampels:]
         else:
-            self.indices = indices
+            raise ValueError("Invalid split value. Use 'train', 'val' or 'test'.")
+
 
     def __len__(self) -> int:
         return len(self.indices)
 
+
     def __getitem__(self, idx: Any) -> Any:
         img_idx = self.indices[idx]
-        img_name = self.image_filenames[img_idx]
-        mask_name = self.mask_filenames[img_idx]
-
+        img = self.image_list[img_idx]
+        mask = self.mask_list[img_idx]
         
-        if self.channel_num == 3:
-            image = np.array(Image.open(img_name).convert("RGB"), dtype=np.float32)
-        elif self.channel_num == 1:
-            image = np.array(Image.open(img_name).convert("L"), dtype=np.float32)       
-            image = np.stack((image, image, image), axis=2)      
-        else:
-            raise ValueError("Only images with only one or three channels are available so far")
-
-        mask = np.array(Image.open(mask_name).convert("L"), dtype=np.float32)
-
-        image = image / 255.0
-        mask = mask / 255.0
-
-        if self.transformations is not None:
-            augmentations = self.transformations(image=image, mask=mask)
-            image = augmentations["image"]
-            mask = augmentations["mask"]
-
-        mask = np.expand_dims(mask, axis=0)
-
-        return image, mask
-
-
-class EvalDataset(Dataset):
-    def __init__(self, data_dir: str, transformations: A.Compose = None, channel_num : int = 3) -> None:
-        if not os.path.exists(data_dir):
-            return ValueError(f'Provided data_dir: "{data_dir}" does not exist.')
-
-        self.data_dir = data_dir
-        self.image_dir = os.path.join(data_dir, "Image")
-        self.mask_dir = os.path.join(data_dir, "Mask")
-        self.image_filenames = sorted(glob(os.path.join(self.image_dir, "*.png")))
-        self.mask_filenames = sorted(glob(os.path.join(self.mask_dir, "*.png")))
-        self.transformations = transformations
-        self.channel_num = channel_num
-
-    def __len__(self) -> int:
-        return len(self.image_filenames)
-
-    def __getitem__(self, idx: Any) -> Any:
-        img_name = self.image_filenames[idx]
-        mask_name = self.mask_filenames[idx]
-
-        if self.channel_num == 3:
-            image = np.array(Image.open(img_name).convert("RGB"), dtype=np.float32)
-        elif self.channel_num == 1:
-            image = np.array(Image.open(img_name).convert("L"), dtype=np.float32)       
-            image = np.stack((image, image, image), axis=2)      
-        else:
-            raise ValueError("Only images with only one or three channels are available so far")
+        image_np = np.array(img, dtype=np.float32)
+        mask_np = np.array(mask, dtype=np.float32)
         
-        mask = np.array(Image.open(mask_name).convert("L"), dtype=np.float32)
+        padded_img = np.pad(image_np, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
+        padded_mask = np.pad(mask_np, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
+        
+        if self.transform == True :
+            processed_img = self.custom_transform(padded_img)
+            processed_mask = self.custom_transform(padded_mask)
+        else:
+            processed_img = transforms.ToTensor(padded_img)
+            processed_mask = transforms.ToTensor(padded_mask)
 
-        image = image / 255.0
-        mask = mask / 255.0
-
-        if self.transformations is not None:
-            augmentations = self.transformations(image=image, mask=mask)
-            image = augmentations["image"]
-            mask = augmentations["mask"]
-
-        mask = np.expand_dims(mask, axis=0)
-
-        return image, mask
+        return processed_img, processed_mask
 
 
-if __name__ == "__main__":
+
+""" if __name__ == "__main__":
     data_dir = "./data"
     input_size = (256, 256)
 
@@ -157,12 +112,12 @@ if __name__ == "__main__":
     #     print(f"Mask: {masks.shape}")
 
     # Train dataset with pre-split
-    split_train = CustomDataset(data_dir="./data/Train", pre_split=True)
+    split_train = SatelliteDataset(data_dir="./data/Train", pre_split=True)
     split_train_loader = DataLoader(split_train, batch_size=4, shuffle=False)
 
     # Test dataset with pre-split
-    split_test = CustomDataset(data_dir="./data/Val", pre_split=True)
+    split_test = SatelliteDataset(data_dir="./data/Val", pre_split=True)
     split_test_loader = DataLoader(split_train, batch_size=4, shuffle=False)
 
     print(split_train.__len__())
-    print(split_test.__len__())
+    print(split_test.__len__()) """
