@@ -8,7 +8,6 @@ from PIL import Image
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset, DataLoader
 
-
 class CustomDataset(Dataset):
     def __init__(
         self,
