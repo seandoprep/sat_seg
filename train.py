@@ -7,6 +7,7 @@ import click
 import traceback
 import torch
 import torch.optim as optim
+import torch.nn as nn
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -15,7 +16,7 @@ from models.deeplabv3plus import DeepLabV3Plus
 from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
 from models.transunet import TransUNet
-from loss import DiceLoss
+from loss import DiceLoss, DiceBCELoss, IoULoss, FocalLoss, TverskyLoss
 from utils import visualize_training_log, calculate_metrics, gpu_test
 from datetime import datetime
 
@@ -107,11 +108,17 @@ def main(
     # Check GPU Availability
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     gpu_test()
-    
-    # Train Setting
     model.to(device)
 
-    criterion = DiceLoss()
+    # Loss Function Setting
+    #criterion = DiceLoss()
+    #criterion = nn.BCELoss()
+    criterion = DiceBCELoss()
+    #criterion = IoULoss()
+    #criterion = FocalLoss()
+    #criterion = TverskyLoss()
+
+    # Optimizer & Scheduler    
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-6)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", patience=3, factor=0.1, verbose=True
