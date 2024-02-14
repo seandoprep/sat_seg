@@ -8,6 +8,7 @@ import cv2
 import matplotlib.pyplot as plt
 import spectral
 import spectral.io.envi as envi 
+import torch.nn.functional as F
 
 from glob import glob
 from typing import Any
@@ -18,40 +19,33 @@ def calculate_metrics(pred_mask: Any, true_mask: Any) -> torch.Tensor:
     '''
     Calculate Metrics
     '''
-    pred_mask = pred_mask.float()
-    true_mask = true_mask.float()
+    pred_mask = pred_mask.view(-1).float()
+    true_mask = true_mask.view(-1).float()
+    eps=1e-5
 
-    intersection = torch.sum(pred_mask * true_mask)
-    union = torch.sum((pred_mask + true_mask) > 0.5)
+    # Overlap Metrics
+    tp = torch.sum(pred_mask * true_mask)  # TP
+    fp = torch.sum(pred_mask * (1 - true_mask))  # FP
+    fn = torch.sum((1 - pred_mask) * true_mask)  # FN
+    tn = torch.sum((1 - pred_mask) * (1 - true_mask))  # TN   
 
-    # Add a small epsilon to the denominator to avoid division by zero
-    iou = (intersection + SMOOTH) / (union + SMOOTH)
-    dice_coefficient = (2 * intersection + SMOOTH) / (
-        torch.sum(pred_mask) + torch.sum(true_mask) + SMOOTH
-    )
+    iou = (tp + eps) / (tp + fp + fn + eps) 
+    dice = (2 * tp + eps) / (2 * tp + fp + fn + eps)
+    pixel_acc = (tp + tn + eps) / (tp + tn + fp + fn + eps)
+    precision = (tp + eps) / (tp + fp + eps)
+    recall = (tp + eps) / (tp + fn + eps)
+    f1 = ((precision * recall + eps)/(precision + recall + eps))
 
-    pixel_accuracy = intersection / true_mask.numel()
-
-    return iou.item(), dice_coefficient.item(), pixel_accuracy.item()
+    return iou.item(), dice.item(), pixel_acc.item(), f1.item()
 
 
-def save_image(
-        img_path: str,
-        mask_path: str,
-        prediction: Any,
-        output_img_path: str,
-        output_mask_path: str,
-        output_overlay_path: str
+""" def save_image_per_epochs( needs to be modified
+        pred_mask: Any,
+        true_mask: Any
         ) -> None:
     '''
     Save evaluation results 
     '''
-    image = cv2.imread(img_path, cv2.IMREAD_COLOR)
-    mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-    line = np.ones((256, 10, 3)) * 128
-
-    mask = np.expand_dims(mask, axis=-1)
-    mask = np.concatenate([mask, mask, mask], axis=-1)
 
     prediction = np.expand_dims(prediction, axis=-1)
     prediction = np.concatenate([prediction, prediction, prediction], axis=-1)
@@ -61,10 +55,7 @@ def save_image(
 
     overlay_img = np.concatenate([image, line, mask, line, prediction, line, overlay], axis=1)
 
-    cv2.imwrite(output_img_path, prediction)
-    cv2.imwrite(output_mask_path, mask)
-    cv2.imwrite(output_overlay_path, overlay_img)
-    return
+    return """
 
 def visualize_training_log(training_logs_csv: str, img_save_path: str):
     '''
@@ -80,6 +71,8 @@ def visualize_training_log(training_logs_csv: str, img_save_path: str):
     pixacc_val = training_log['Avg Pix Acc Val']
     dice_train = training_log['Avg Dice Coeff Train']
     dice_val = training_log['Avg Dice Coeff Val']
+    f1_train = training_log['Avg F1 Train']
+    f1_val = training_log['Avg F1 Val']
     lr = training_log['Learning Rate']
 
     plt.figure(figsize=(28,16))
@@ -122,6 +115,15 @@ def visualize_training_log(training_logs_csv: str, img_save_path: str):
 
     # Learning rate
     plt.subplot(2, 3, 5)
+    plt.plot(epochs, f1_train)
+    plt.plot(epochs, f1_val)
+    plt.title('Train/Val F1')
+    plt.xlabel('epochs')
+    plt.ylabel('f1')
+    plt.legend(('val', 'train'))
+
+    # Learning rate
+    plt.subplot(2, 3, 6)
     plt.plot(epochs, lr)
     plt.title('Learning rate')
     plt.xlabel('epochs')
@@ -148,7 +150,7 @@ def gpu_test():
 # Pad and Crop 
 def pad_crop(original_array : np.ndarray, split_size : int):
     
-    original_channel, original_height, original_width = original_array.shape
+    _, original_height, original_width = original_array.shape
 
     # Padding 
     X_num = (original_width - split_size) // split_size + 1
@@ -172,7 +174,7 @@ def pad_crop(original_array : np.ndarray, split_size : int):
             end_x = start_x + split_size
             end_y = start_y + split_size
 
-            cropped_image = padded_array[start_x:end_x, start_y:end_y, :]
+            cropped_image = padded_array[:, start_x:end_x, start_y:end_y]
             cropped_images.append(cropped_image)
 
     return np.array(cropped_images)

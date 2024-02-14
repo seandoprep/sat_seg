@@ -26,7 +26,7 @@ CLASSES = 1  # For Binary Segmentatoin
 
 
 @click.command()
-@click.option("-D", "--data-dir", type=str, required=True, help="Path for Data Directory")
+@click.option("-D", "--data-dir", type=str, default='data\\Train\\ENVI', help="Path for Data Directory")
 @click.option(
     "-M",
     "--model-name",
@@ -140,6 +140,8 @@ def main(
         "Avg Pix Acc Val",
         "Avg Dice Coeff Train",
         "Avg Dice Coeff Val",
+        "Avg F1 Train",
+        "Avg F1 Val",
         "Learning Rate",
     ]
 
@@ -162,6 +164,7 @@ def main(
             total_iou_train = 0.0
             total_pixel_accuracy_train = 0.0
             total_dice_coefficient_train = 0.0
+            total_f1_train = 0.0
 
             train_dataloader = tqdm(
                 train_dataloader, desc=f"Epoch {epoch + 1}/{num_epochs}", unit="batch"
@@ -185,13 +188,14 @@ def main(
                 # Calculating metrics for training
                 with torch.no_grad():
                     pred_masks = outputs > 0.5
-                    iou_train, dice_coefficient_train, pixel_accuracy_train = calculate_metrics(
+                    iou_train, dice_coefficient_train, pixel_accuracy_train, f1_train = calculate_metrics(
                         pred_masks, masks
                     )
 
                     total_iou_train += iou_train
                     total_dice_coefficient_train += dice_coefficient_train
                     total_pixel_accuracy_train += pixel_accuracy_train
+                    total_f1_train += f1_train
 
                 # Displaying metrics in the progress bar description
                 train_dataloader.set_postfix(
@@ -199,6 +203,7 @@ def main(
                     train_iou=iou_train,
                     train_pix_acc=pixel_accuracy_train,
                     train_dice_coef=dice_coefficient_train,
+                    train_f1=f1_train,
                     lr=current_lr,
                 )
 
@@ -206,6 +211,7 @@ def main(
             avg_iou_train = total_iou_train / len(train_dataloader)
             avg_pixel_accuracy_train = total_pixel_accuracy_train / len(train_dataloader)
             avg_dice_coefficient_train = total_dice_coefficient_train / len(train_dataloader)
+            avg_f1_train = total_f1_train / len(train_dataloader)
 
             # VALIDATION
             model.eval()
@@ -213,6 +219,7 @@ def main(
             total_iou_val = 0.0
             total_pixel_accuracy_val = 0.0
             total_dice_coefficient_val = 0.0
+            total_f1_val = 0.0
 
             val_dataloader = tqdm(val_dataloader, desc=f"Validation", unit="batch")
 
@@ -226,13 +233,14 @@ def main(
 
                     # Calculating metrics for Validation
                     pred_masks = outputs > 0.5
-                    iou_val, dice_coefficient_val, pixel_accuracy_val = calculate_metrics(
+                    iou_val, dice_coefficient_val, pixel_accuracy_val, f1_val = calculate_metrics(
                         pred_masks, masks
                     )
 
                     total_iou_val += iou_val
                     total_pixel_accuracy_val += pixel_accuracy_val
                     total_dice_coefficient_val += dice_coefficient_val
+                    total_f1_val += f1_val
 
                     # Displaying metrics in progress bar description
                     val_dataloader.set_postfix(
@@ -240,6 +248,7 @@ def main(
                         val_iou=iou_val,
                         val_pix_acc=pixel_accuracy_val,
                         val_dice_coef=dice_coefficient_val,
+                        val_f1=f1_val,
                         lr=current_lr,
                     )
 
@@ -247,6 +256,7 @@ def main(
             avg_iou_val = total_iou_val / len(val_dataloader)
             avg_pixel_accuracy_val = total_pixel_accuracy_val / len(val_dataloader)
             avg_dice_coefficient_val = total_dice_coefficient_val / len(val_dataloader)
+            avg_f1_val = total_f1_val / len(val_dataloader)
 
             scheduler.step(val_loss)
 
@@ -260,6 +270,8 @@ def main(
                 f"Avg Pix Acc Val: {avg_pixel_accuracy_val:.4f}\n"
                 f"Avg Dice Coeff Train: {avg_dice_coefficient_train:.4f}\n"
                 f"Avg Dice Coeff Val: {avg_dice_coefficient_val:.4f}\n"
+                f"Avg F1 Train: {avg_f1_train:.4f}\n"
+                f"Avg F1 Val: {avg_f1_val:.4f}\n"
                 f"Current LR: {current_lr}\n"
                 f"{'-'*50}"
             )
@@ -294,6 +306,8 @@ def main(
                     avg_pixel_accuracy_val,
                     avg_dice_coefficient_train,
                     avg_dice_coefficient_val,
+                    avg_f1_train,
+                    avg_f1_val,
                     current_lr,
                 ]
             )

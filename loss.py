@@ -21,8 +21,8 @@ class DiceLoss(nn.Module):
         pred_mask = F.sigmoid(pred_mask)
 
         #flatten label and prediction tensors
-        pred_mask = pred_mask.view(-1)
-        true_mask = true_mask.view(-1)
+        pred_mask = pred_mask.view(-1).float()
+        true_mask = true_mask.view(-1).float()
 
         intersection = torch.sum(pred_mask * true_mask)
         total = torch.sum(pred_mask) + torch.sum(true_mask)
@@ -40,8 +40,8 @@ class DiceBCELoss(nn.Module):
         pred_mask = F.sigmoid(pred_mask)     
         
         #flatten label and prediction tensors
-        pred_mask = pred_mask.view(-1)
-        true_mask = true_mask.view(-1)
+        pred_mask = pred_mask.view(-1).float()
+        true_mask = true_mask.view(-1).float()
 
         intersection = torch.sum(pred_mask * true_mask)
         total = torch.sum(pred_mask) + torch.sum(true_mask)
@@ -63,8 +63,8 @@ class IoULoss(nn.Module):
         pred_mask = F.sigmoid(pred_mask)       
         
         #flatten label and prediction tensors
-        pred_mask = pred_mask.view(-1)
-        true_mask = true_mask.view(-1)
+        pred_mask = pred_mask.view(-1).float()
+        true_mask = true_mask.view(-1).float()
         
         #intersection is equivalent to True Positive count
         #union is the mutually inclusive area of all labels & predictions 
@@ -86,8 +86,8 @@ class FocalLoss(nn.Module):
         pred_mask = F.sigmoid(pred_mask)       
         
         #flatten label and prediction tensors
-        pred_mask = pred_mask.view(-1)
-        true_mask = true_mask.view(-1)
+        pred_mask = pred_mask.view(-1).float()
+        true_mask = true_mask.view(-1).float()
         
         #first compute binary cross-entropy 
         BCE = F.binary_cross_entropy(pred_mask, true_mask, reduction='mean')
@@ -106,8 +106,8 @@ class TverskyLoss(nn.Module):
         pred_mask = F.sigmoid(pred_mask)       
         
         #flatten label and prediction tensors
-        pred_mask = pred_mask.view(-1)
-        true_mask = true_mask.view(-1)
+        pred_mask = pred_mask.view(-1).float()
+        true_mask = true_mask.view(-1).float()
         
         #True Positives, False Positives & False Negatives
         TP = (pred_mask * true_mask).sum()    
