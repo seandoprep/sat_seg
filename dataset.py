@@ -2,6 +2,7 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import numpy as np
 import torchvision.transforms as transforms
+import random
 
 from typing import Any
 from torch.utils.data import Dataset
@@ -29,6 +30,8 @@ class SatelliteDataset(Dataset):
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
         self.transform = transform
+
+        random.seed(99)
         self.custom_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.RandomHorizontalFlip(p=0.5),
@@ -40,7 +43,7 @@ class SatelliteDataset(Dataset):
         indices = list(range(num_samples))
 
         # Data Split
-        np.random.seed(42)
+        np.random.seed(99)
         np.random.shuffle(indices)
         num_val_samples = int(self.val_ratio * num_samples)
         num_test_sampels = int(self.test_ratio * num_samples)
