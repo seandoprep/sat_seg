@@ -39,27 +39,65 @@ def calculate_metrics(pred_mask: Any, true_mask: Any) -> torch.Tensor:
     return iou.item(), dice.item(), pixel_acc.item(), f1.item()
 
 
-""" def save_image_per_epochs( needs to be modified
+def visualize_train( 
+        original_img: Any,
         pred_mask: Any,
-        true_mask: Any
+        true_mask: Any,
+        img_save_path : str,
+        epoch : str,
+        iter : str,
         ) -> None:
     '''
-    Save evaluation results 
+    Visualize training process per epoch.
     '''
+    original_img_cpu = original_img[0].cpu().numpy()
+    pred_mask_binary = F.sigmoid(pred_mask[0, 0]) > 0.5
 
-    prediction = np.expand_dims(prediction, axis=-1)
-    prediction = np.concatenate([prediction, prediction, prediction], axis=-1)
+    band_1 = original_img_cpu[0,:,:] * 255
+    band_2 = original_img_cpu[1,:,:] * 255
+    band_3 = original_img_cpu[2,:,:] * 255
+    pred = pred_mask_binary.cpu().numpy() * 255
+    true = true_mask[0, 0].cpu().numpy() * 255
+    overlay = np.multiply(pred, true)
 
-    overlay = np.multiply(image, prediction)
-    prediction = prediction * 255
+    plt.figure(figsize=(28,16))
 
-    overlay_img = np.concatenate([image, line, mask, line, prediction, line, overlay], axis=1)
+    # 
+    plt.subplot(2, 3, 1)
+    plt.imshow(band_1)
+    plt.title('Band 1')
 
-    return """
+    # 
+    plt.subplot(2, 3, 2)
+    plt.imshow(band_2)
+    plt.title('Band 2')
+
+    # Pixel accuracy
+    plt.subplot(2, 3, 3)
+    plt.imshow(band_3)
+    plt.title('Band 3')
+
+    # Prediction
+    plt.subplot(2, 3, 4)
+    plt.imshow(pred)
+    plt.title('Prediction')
+
+    # True Mask
+    plt.subplot(2, 3, 5)
+    plt.imshow(true)
+    plt.title('True Mask')
+
+    # Overlay
+    plt.subplot(2, 3, 6)
+    plt.imshow(overlay)
+    plt.title('Overlay')
+
+    plt.savefig(os.path.join(img_save_path, 'Training_result_epoch_{}_iter_{}.png'.format(epoch, iter)))
+    plt.close()
 
 def visualize_training_log(training_logs_csv: str, img_save_path: str):
     '''
-    Show and Save training log visualization img
+    Visualize training log and Save it.
     '''
     training_log = pd.read_csv(training_logs_csv)
     epochs = training_log['Epoch']
@@ -130,6 +168,7 @@ def visualize_training_log(training_logs_csv: str, img_save_path: str):
     plt.ylabel('learning_rate')
 
     plt.savefig(os.path.join(img_save_path, 'Training_log.png'))
+    plt.close()
 
 
 def gpu_test():

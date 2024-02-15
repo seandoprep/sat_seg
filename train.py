@@ -17,7 +17,7 @@ from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
 from models.transunet import TransUNet
 from loss import DiceLoss, DiceBCELoss, IoULoss, FocalLoss, TverskyLoss
-from utils import visualize_training_log, calculate_metrics, gpu_test
+from utils import visualize_training_log, calculate_metrics, gpu_test, visualize_train
 from datetime import datetime
 
 INPUT_CHANNEL_NUM = 3
@@ -38,7 +38,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-E",
     "--num-epochs",
     type=int,
-    default=25,
+    default=20,
     help="Number of epochs to train the model for. Default - 25",
 )
 @click.option(
@@ -172,18 +172,29 @@ def main(
 
             current_lr = optimizer.param_groups[0]["lr"]
 
+            iter = 0
             for images, masks in train_dataloader:
                 images, masks = images.to(device), masks.to(device)
 
                 optimizer.zero_grad()
 
                 outputs = model(images)
+                if epoch % 10 == 0:
+                    if iter % 100 == 0:
+                        visualize_train(images, outputs, masks, 
+                                        img_save_path= 'outputs/train_output', 
+                                        epoch = str(epoch), iter = str(iter))
+                        click.echo(
+                            f"\n{click.style(text=f'Saved Train Process', fg='green')}\t{click.style(text=f'Epoch : ', fg='green')}{str(epoch)}\t{click.style(text=f'Iter : ', fg='green')}{str(iter)}"
+                            )
+
                 t_loss = criterion(outputs, masks)
 
                 t_loss.backward()
                 optimizer.step()
 
                 train_loss += t_loss.item()
+                iter += 1
 
                 # Calculating metrics for training
                 with torch.no_grad():
@@ -324,7 +335,7 @@ def main(
     click.secho(message="🎉 Training Done!", fg="blue", nl=True)
 
     # Save train result
-    train_base_dir = 'weights/train_output'
+    train_base_dir = 'outputs/train_output'
     now = datetime.now()
     folder_name = now.strftime("%Y_%m_%d_%H_%M_%S") + model_name
     train_output_dir = os.path.join(train_base_dir, folder_name)
