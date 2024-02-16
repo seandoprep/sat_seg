@@ -38,22 +38,22 @@ CLASSES = 1  # For Binary Segmentatoin
     "-E",
     "--num-epochs",
     type=int,
-    default=20,
-    help="Number of epochs to train the model for. Default - 25",
+    default=100,
+    help="Number of epochs to train the model for. Default - 100",
 )
 @click.option(
     "-L",
     "--learning-rate",
     type=float,
-    default=1e-4,
-    help="Learning Rate for model. Default - 1e-4",
+    default=1e-3,
+    help="Learning Rate for model. Default - 1e-3",
 )
 @click.option(
     "-B",
     "--batch-size",
     type=int,
-    default=8,
-    help="Batch size of data for training. Default - 8",
+    default=16,
+    help="Batch size of data for training. Default - 32",
 )
 @click.option(
     "-S",
@@ -111,9 +111,9 @@ def main(
     model.to(device)
 
     # Loss Function Setting
-    #criterion = DiceLoss()
+    criterion = DiceLoss()
     #criterion = nn.BCELoss()
-    criterion = DiceBCELoss()
+    #criterion = DiceBCELoss()
     #criterion = IoULoss()
     #criterion = FocalLoss()
     #criterion = TverskyLoss()
@@ -123,9 +123,10 @@ def main(
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", patience=3, factor=0.1, verbose=True
     )
+    #scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)    
 
     # For Early-Stopping
-    patience_epochs = 20
+    patience_epochs = 10
     no_improvement_epochs = 0
 
     # Logging
@@ -179,8 +180,8 @@ def main(
                 optimizer.zero_grad()
 
                 outputs = model(images)
-                if epoch % 10 == 0:
-                    if iter % 100 == 0:
+                if epoch % 5 == 0:
+                    if iter % 50 == 0:
                         visualize_train(images, outputs, masks, 
                                         img_save_path= 'outputs/train_output', 
                                         epoch = str(epoch), iter = str(iter))

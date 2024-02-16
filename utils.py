@@ -218,8 +218,18 @@ def pad_crop(original_array : np.ndarray, split_size : int):
 
     return np.array(cropped_images)
 
+# Band Normalization
+def band_norm_minmax(band : np.array):
+    if band.any() < 0:
+        band_abs = abs(band)
+        band_norm_minmax = ((band_abs - np.min(band_abs))) / (np.max(band_abs) - np.min(band_abs))
+    else:
+        band_norm_minmax = ((band - np.min(band))) / (np.max(band) - np.min(band))
 
-def read_envi_file(img_path):
+    return band_norm_minmax
+
+# Read ENVI file Format
+def read_envi_file(img_path, norm = True):
     hdr_files = sorted(glob(os.path.join(img_path, "*.hdr")))
     img_files = sorted(glob(os.path.join(img_path, "*.img")))
     band_nums = len(hdr_files)
@@ -230,7 +240,10 @@ def read_envi_file(img_path):
         envi_img_path = img_files[i]
 
         data = envi.open(envi_hdr_path, envi_img_path)
-        img = np.array(data.load())[:,:,0]
+        if norm:
+            img = np.array(data.load())[:,:,0]
+            img = band_norm_minmax(img)
         envi_data.append(img)
 
     return np.array(envi_data)
+

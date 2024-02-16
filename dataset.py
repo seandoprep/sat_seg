@@ -24,8 +24,8 @@ class SatelliteDataset(Dataset):
         self.data_dir = data_dir
         self.image_dir = os.path.join(data_dir, "Image")
         self.mask_dir = os.path.join(data_dir, "Mask")
-        self.image_list = pad_crop(read_envi_file(self.image_dir), 224)
-        self.mask_list = pad_crop(read_envi_file(self.mask_dir), 224)
+        self.image_list = pad_crop(read_envi_file(self.image_dir, True), 224)
+        self.mask_list = pad_crop(read_envi_file(self.mask_dir, True), 224)
         self.split = split
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
@@ -34,9 +34,9 @@ class SatelliteDataset(Dataset):
         random.seed(99)
         self.custom_transform = transforms.Compose([
             transforms.ToTensor(),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomVerticalFlip(p=0.5),
-            transforms.RandomRotation(10),
+            #transforms.RandomHorizontalFlip(p=0.5),
+            #transforms.RandomVerticalFlip(p=0.5),
+            #transforms.RandomRotation(10),
         ])
 
         num_samples = len(self.image_list)
