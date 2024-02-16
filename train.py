@@ -19,6 +19,7 @@ from models.transunet import TransUNet
 from loss import DiceLoss, DiceBCELoss, IoULoss, FocalLoss, TverskyLoss
 from utils import visualize_training_log, calculate_metrics, gpu_test, visualize_train
 from datetime import datetime
+from scheduler import CosineAnnealingWarmUpRestarts
 
 INPUT_CHANNEL_NUM = 3
 INPUT = (256, 256)
@@ -45,7 +46,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-L",
     "--learning-rate",
     type=float,
-    default=1e-3,
+    default=0,
     help="Learning Rate for model. Default - 1e-3",
 )
 @click.option(
@@ -119,11 +120,14 @@ def main(
     #criterion = TverskyLoss()
 
     # Optimizer & Scheduler    
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-6)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", patience=3, factor=0.1, verbose=True
-    )
+    #optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-6)
+    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+    #    optimizer, mode="min", patience=3, factor=0.1, verbose=True
+    #)
     #scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)    
+
+    optimizer = optim.Adam(model.parameters(), lr = learning_rate)
+    scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=150, T_mult=1, eta_max=0.1,  T_up=10, gamma=0.5)
 
     # For Early-Stopping
     patience_epochs = 10
