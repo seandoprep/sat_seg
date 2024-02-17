@@ -66,32 +66,32 @@ def visualize_train(
 
     # 
     plt.subplot(2, 3, 1)
-    plt.imshow(band_1)
+    plt.imshow(band_1, cmap='gray', extent=[0, 1, 0, 1])
     plt.title('Band 1')
 
     # 
     plt.subplot(2, 3, 2)
-    plt.imshow(band_2)
+    plt.imshow(band_2, cmap='gray', extent=[0, 1, 0, 1])
     plt.title('Band 2')
 
     # Pixel accuracy
     plt.subplot(2, 3, 3)
-    plt.imshow(band_3)
+    plt.imshow(band_3, cmap='gray', extent=[0, 1, 0, 1])
     plt.title('Band 3')
 
     # Prediction
     plt.subplot(2, 3, 4)
-    plt.imshow(pred)
+    plt.imshow(pred, cmap='gray', extent=[0, 1, 0, 1])
     plt.title('Prediction')
 
     # True Mask
     plt.subplot(2, 3, 5)
-    plt.imshow(true)
+    plt.imshow(true, cmap='gray', extent=[0, 1, 0, 1])
     plt.title('True Mask')
 
     # Overlay
     plt.subplot(2, 3, 6)
-    plt.imshow(overlay)
+    plt.imshow(overlay, cmap='gray', extent=[0, 1, 0, 1])
     plt.title('Overlay')
 
     plt.savefig(os.path.join(img_save_path, 'Training_result_epoch_{}_iter_{}.png'.format(epoch, iter)))
@@ -283,7 +283,7 @@ def read_envi_file(img_path, norm = True):
         data = envi.open(envi_hdr_path, envi_img_path)
         if norm:
             img = np.array(data.load())[:,:,0]
-            img = band_norm(img, 'linear_norm')
+            img = band_norm(img, 'dynamic_world_norm')
         envi_data.append(img)
 
     return np.array(envi_data)

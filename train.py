@@ -53,8 +53,8 @@ CLASSES = 1  # For Binary Segmentatoin
     "-B",
     "--batch-size",
     type=int,
-    default=16,
-    help="Batch size of data for training. Default - 32",
+    default=5,
+    help="Batch size of data for training. Default - 16",
 )
 @click.option(
     "-S",
