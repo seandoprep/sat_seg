@@ -6,7 +6,7 @@ import random
 
 from typing import Any
 from torch.utils.data import Dataset
-from utils import pad_crop, read_envi_file
+from utils import pad_crop, read_envi_file, find_arrays_with_object
 
 
 class SatelliteDataset(Dataset):
@@ -25,7 +25,7 @@ class SatelliteDataset(Dataset):
         self.image_dir = os.path.join(data_dir, "Image")
         self.mask_dir = os.path.join(data_dir, "Mask")
         self.image_list = pad_crop(read_envi_file(self.image_dir, True), 224)
-        self.mask_list = pad_crop(read_envi_file(self.mask_dir, True), 224)
+        self.mask_list = pad_crop(read_envi_file(self.mask_dir, False), 224)
         self.split = split
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
@@ -39,8 +39,11 @@ class SatelliteDataset(Dataset):
             #transforms.RandomRotation(10),
         ])
 
-        num_samples = len(self.image_list)
-        indices = list(range(num_samples))
+        #num_samples = len(self.image_list)
+        #indices = list(range(num_samples))
+
+        indices = find_arrays_with_object(self.mask_list)
+        num_samples = len(indices)
 
         # Data Split
         np.random.seed(99)

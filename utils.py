@@ -284,6 +284,9 @@ def read_envi_file(img_path, norm = True):
         if norm:
             img = np.array(data.load())[:,:,0]
             img = band_norm(img, 'dynamic_world_norm')
+        else:
+            img = np.array(data.load())[:,:,0]
+            
         envi_data.append(img)
 
     return np.array(envi_data)
