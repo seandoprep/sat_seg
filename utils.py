@@ -234,30 +234,32 @@ def band_norm(band : np.array, norm_type : str):
 
     Reference : https://medium.com/sentinel-hub/how-to-normalize-satellite-images-for-deep-learning-d5b668c885af
     '''
-    if band.any() < 0:
-        band = abs(band)
+    SMOOTH = 1e-5
+    band = abs(band)
 
     if norm_type == 'linear_norm':
-        output_band_lower_bound, output_band_upper_bound = 0, 1  
+        output_band_lower_bound, output_band_upper_bound = SMOOTH, 1  
         input_band_lower_bound, input_band_upper_bound = np.percentile(band, 10), np.percentile(band, 90)
         output_band_range = output_band_upper_bound - output_band_lower_bound
         input_band_range = input_band_upper_bound - input_band_lower_bound
-        band_norm = (band - input_band_lower_bound) * (output_band_range/input_band_range) + output_band_lower_bound
+        band_norm = (band - input_band_lower_bound) * (output_band_range/(input_band_range+SMOOTH)) + output_band_lower_bound
 
     elif norm_type == 'dynamic_world_norm':
     
         def sigmoid(x):
             return 1 / (1 + np.exp(-x))
-
+        
         band_log = np.log1p(band)
+
         input_band_lower_bound, input_band_upper_bound = np.percentile(band_log, 30), np.percentile(band_log, 70)
-        band_norm = sigmoid((band_log - input_band_lower_bound) / (input_band_upper_bound - input_band_lower_bound))
+        band_norm = sigmoid((band_log - input_band_lower_bound) / (input_band_upper_bound - input_band_lower_bound + SMOOTH))
     
     elif norm_type == 'hist_eq':
         flattened_band = band.flatten()
-        hist, _ = np.histogram(flattened_band, bins=40000, range=[0,1])
+        hist, bins = np.histogram(flattened_band, bins=40000, range=[0,1])
         cdf = hist.cumsum()
-        band_norm = np.interp(flattened_band, range(1), cdf).reshape(flattened_band.shape)
+        cdf_normalized = cdf / cdf[-1]
+        band_norm = np.interp(flattened_band, bins[:-1], cdf_normalized).reshape(band.shape)
 
     else:
         raise Exception("norm_type should be one of 'linear_norm', 'dynamic_world_norm', and 'hist_eq'.")
@@ -285,3 +287,8 @@ def read_envi_file(img_path, norm = True):
         envi_data.append(img)
 
     return np.array(envi_data)
+
+def find_arrays_with_one(arrays_list):
+    indices_with_one = [index for index, array in enumerate(arrays_list) if np.any(array > 1e-5)]
+
+    return indices_with_one
