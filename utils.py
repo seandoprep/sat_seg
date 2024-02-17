@@ -18,6 +18,8 @@ SMOOTH = 1e-8
 def calculate_metrics(pred_mask: Any, true_mask: Any) -> torch.Tensor:
     '''
     Calculate Metrics
+
+    Metrics : IOU, Dice score, Pixel Accuracy, Precision, Recall, F1 score.
     '''
     pred_mask = pred_mask.view(-1).float()
     true_mask = true_mask.view(-1).float()
@@ -48,7 +50,7 @@ def visualize_train(
         iter : str,
         ) -> None:
     '''
-    Visualize training process per epoch.
+    Visualize training process per epoch and Save it.
     '''
     original_img_cpu = original_img[0].cpu().numpy()
     pred_mask_binary = F.sigmoid(pred_mask[0, 0]) > 0.5
@@ -188,7 +190,9 @@ def gpu_test():
 
 # Pad and Crop 
 def pad_crop(original_array : np.ndarray, split_size : int):
-    
+    '''
+    Pad and Crop Large Satellite Images for deep learning training.
+    '''
     _, original_height, original_width = original_array.shape
 
     # Padding 
@@ -219,17 +223,52 @@ def pad_crop(original_array : np.ndarray, split_size : int):
     return np.array(cropped_images)
 
 # Band Normalization
-def band_norm_minmax(band : np.array):
-    if band.any() < 0:
-        band_abs = abs(band)
-        band_norm_minmax = ((band_abs - np.min(band_abs))) / (np.max(band_abs) - np.min(band_abs))
-    else:
-        band_norm_minmax = ((band - np.min(band))) / (np.max(band) - np.min(band))
+def band_norm(band : np.array, norm_type : str):
+    '''
+    Band Normalization for Satellite Image. 
 
-    return band_norm_minmax
+    Tips : 
+    1) Negative values are changed to Positive values for deep learning training
+    2) norm_type should be one of linear_norm, dynamic_world_norm, and hist_eq.
+    3) Modify boundary values as necessary
+
+    Reference : https://medium.com/sentinel-hub/how-to-normalize-satellite-images-for-deep-learning-d5b668c885af
+    '''
+    if band.any() < 0:
+        band = abs(band)
+
+    if norm_type == 'linear_norm':
+        output_band_lower_bound, output_band_upper_bound = 0, 1  
+        input_band_lower_bound, input_band_upper_bound = np.percentile(band, 10), np.percentile(band, 90)
+        output_band_range = output_band_upper_bound - output_band_lower_bound
+        input_band_range = input_band_upper_bound - input_band_lower_bound
+        band_norm = (band - input_band_lower_bound) * (output_band_range/input_band_range) + output_band_lower_bound
+
+    elif norm_type == 'dynamic_world_norm':
+    
+        def sigmoid(x):
+            return 1 / (1 + np.exp(-x))
+
+        band_log = np.log1p(band)
+        input_band_lower_bound, input_band_upper_bound = np.percentile(band_log, 30), np.percentile(band_log, 70)
+        band_norm = sigmoid((band_log - input_band_lower_bound) / (input_band_upper_bound - input_band_lower_bound))
+    
+    elif norm_type == 'hist_eq':
+        flattened_band = band.flatten()
+        hist, _ = np.histogram(flattened_band, bins=40000, range=[0,1])
+        cdf = hist.cumsum()
+        band_norm = np.interp(flattened_band, range(1), cdf).reshape(flattened_band.shape)
+
+    else:
+        raise Exception("norm_type should be one of 'linear_norm', 'dynamic_world_norm', and 'hist_eq'.")
+
+    return band_norm
 
 # Read ENVI file Format
 def read_envi_file(img_path, norm = True):
+    '''
+    Read ENVI file Format and return it as numpy array type.
+    '''
     hdr_files = sorted(glob(os.path.join(img_path, "*.hdr")))
     img_files = sorted(glob(os.path.join(img_path, "*.img")))
     band_nums = len(hdr_files)
@@ -242,8 +281,7 @@ def read_envi_file(img_path, norm = True):
         data = envi.open(envi_hdr_path, envi_img_path)
         if norm:
             img = np.array(data.load())[:,:,0]
-            img = band_norm_minmax(img)
+            img = band_norm(img, 'linear_norm')
         envi_data.append(img)
 
     return np.array(envi_data)
-
