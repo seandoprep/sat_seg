@@ -288,7 +288,7 @@ def read_envi_file(img_path, norm = True):
 
     return np.array(envi_data)
 
-def find_arrays_with_one(arrays_list):
+def find_arrays_with_object(arrays_list):
     indices_with_one = [index for index, array in enumerate(arrays_list) if np.any(array > 1e-5)]
 
     return indices_with_one

@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt 
 import click
 
-from utils import band_norm, pad_crop, read_envi_file, find_arrays_with_one
+from utils import band_norm, pad_crop, read_envi_file, find_arrays_with_object
 
 @click.command()
 @click.option("-D", "--data-dir", type=str, default='data\\Train\\ENVI', help="Path for Data Directory")
@@ -24,7 +24,7 @@ def main(
     mask_list = pad_crop(read_envi_file(mask_dir, True), 224)
     
     # Random Sampling
-    indices = find_arrays_with_one(mask_list)
+    indices = find_arrays_with_object(mask_list)
     print(len(indices))
 
     np.random.seed(54)

@@ -6,7 +6,7 @@ import random
 
 from typing import Any
 from torch.utils.data import Dataset
-from utils import pad_crop, read_envi_file
+from utils import pad_crop, read_envi_file, find_arrays_with_object
 
 
 class SatelliteDataset(Dataset):
@@ -39,8 +39,10 @@ class SatelliteDataset(Dataset):
             #transforms.RandomRotation(10),
         ])
 
-        num_samples = len(self.image_list)
-        indices = list(range(num_samples))
+        #num_samples = len(self.image_list)
+        #indices = list(range(num_samples))
+        indices = find_arrays_with_object(self.mask_list)
+        num_samples = len(indices)
 
         # Data Split
         np.random.seed(99)
