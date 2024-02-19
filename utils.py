@@ -225,13 +225,13 @@ def pad_crop(original_array : np.ndarray, split_size : int):
     return np.array(cropped_images)
 
 # Band Normalization
-def band_norm(band : np.array, norm_type : str):
+def band_norm(band : np.array, norm_type : str, value_check : bool):
     '''
     Band Normalization for Satellite Image. 
 
     Tips : 
     1) Negative values are changed to Positive values for deep learning training
-    2) norm_type should be one of linear_norm, dynamic_world_norm, and hist_eq.
+    2) norm_type should be one of linear_norm, or dynamic_world_norm
     3) Modify boundary values as necessary
 
     Reference : https://medium.com/sentinel-hub/how-to-normalize-satellite-images-for-deep-learning-d5b668c885af
@@ -266,10 +266,32 @@ def band_norm(band : np.array, norm_type : str):
     else:
         raise Exception("norm_type should be one of 'linear_norm', or 'dynamic_world_norm'.")
 
+    if value_check:
+        print("Band Value :\n", band)
+        print("Band Min Max :", np.min(band), np.max(band))
+        print("Band abs Value :\n", band_abs)
+        print("Band abs Min Max :", np.min(band_abs), np.max(band_abs))
+        print("Input Lower Bound :", input_band_lower_bound)
+        print("Input Upper Bound :", input_band_upper_bound)
+        print("Band Norm Value :", band_norm)
+        print("Band Norm Min Max :", np.min(band_norm), np.max(band_norm))
+        print('--------------------------------------------------')
+
     return band_norm
 
+""" def terrain_masking(band : np.array, shp_file):
+    '''
+    Replace Terrain Value(0) to mean value of water
+    '''
+    
+    
+    
+    return """
+
+
+
 # Read ENVI file Format
-def read_envi_file(img_path, norm = True):
+def read_envi_file(img_path, norm = True, norm_type = 'linear_norm'):
     '''
     Read ENVI file Format and return it as numpy array type.
     '''
@@ -285,7 +307,7 @@ def read_envi_file(img_path, norm = True):
         data = envi.open(envi_hdr_path, envi_img_path)
         if norm:
             img = np.array(data.load())[:,:,0]
-            img = band_norm(img, 'linear_norm')
+            img = band_norm(img, norm_type, True)
         else:
             img = np.array(data.load())[:,:,0]
             

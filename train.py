@@ -113,9 +113,9 @@ def main(
     model.to(device)
 
     # Loss Function Setting
-    criterion = DiceLoss()
+    #criterion = DiceLoss()
     #criterion = nn.BCELoss()
-    #criterion = DiceBCELoss()
+    criterion = DiceBCELoss()
     #criterion = IoULoss()
     #criterion = FocalLoss()
     #criterion = TverskyLoss()
@@ -204,7 +204,7 @@ def main(
 
                 # Calculating metrics for training
                 with torch.no_grad():
-                    pred_masks = F.sigmoid(outputs) > 0.5
+                    pred_masks = outputs > 0.5
                     iou_train, dice_coefficient_train, pixel_accuracy_train, f1_train = calculate_metrics(
                         pred_masks, masks
                     )

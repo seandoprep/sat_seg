@@ -24,8 +24,8 @@ class SatelliteDataset(Dataset):
         self.data_dir = data_dir
         self.image_dir = os.path.join(data_dir, "Image")
         self.mask_dir = os.path.join(data_dir, "Mask")
-        self.image_list = pad_crop(read_envi_file(self.image_dir, True), 224)
-        self.mask_list = pad_crop(read_envi_file(self.mask_dir, False), 224)
+        self.image_list = pad_crop(read_envi_file(self.image_dir, True, 'dynamic_world_norm'), 224)
+        self.mask_list = pad_crop(read_envi_file(self.mask_dir, False, None), 224)
         self.split = split
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
@@ -69,11 +69,11 @@ class SatelliteDataset(Dataset):
         img = self.image_list[img_idx]
         mask = self.mask_list[img_idx]
         
-        image_np = np.array(img, dtype=np.float32)
-        mask_np = np.array(mask, dtype=np.float32)
+        #image_np = np.array(img, dtype=np.float32)
+        #mask_np = np.array(mask, dtype=np.float32)
         
-        padded_img = np.pad(image_np, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
-        padded_mask = np.pad(mask_np, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
+        padded_img = np.pad(img, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
+        padded_mask = np.pad(mask, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
         
         if self.transform == True :
             processed_img = self.custom_transform(padded_img)
