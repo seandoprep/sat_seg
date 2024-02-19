@@ -2,6 +2,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt 
 import click
+import cv2
 
 from utils import band_norm, pad_crop, read_envi_file, find_arrays_with_object
 
@@ -21,13 +22,12 @@ def main(
     image_dir = os.path.join(data_dir, "Image")
     mask_dir = os.path.join(data_dir, "Mask")
     image_list = pad_crop(read_envi_file(image_dir, True), 224)
-    mask_list = pad_crop(read_envi_file(mask_dir, True), 224)
+    mask_list = pad_crop(read_envi_file(mask_dir, False), 224)
     
     # Random Sampling
     indices = find_arrays_with_object(mask_list)
-    print(len(indices))
 
-    np.random.seed(54)
+    np.random.seed(59)
     np.random.shuffle(indices)
     sample = indices[0]
 
@@ -42,15 +42,31 @@ def main(
         org_band = image_np[i,:,:]
         linear_norm = band_norm(org_band, 'linear_norm')
         dynamic_world_norm = band_norm(org_band, 'dynamic_world_norm')
-        hist_eq = band_norm(org_band, 'hist_eq')
         true_mask = mask_np[0,:,:]
 
-        results = [org_band, linear_norm, dynamic_world_norm, hist_eq, true_mask]
+        results = [org_band, linear_norm, dynamic_world_norm, true_mask]
         labels = ['Band_{}'.format(i+1), 'Linear Normalization', 'Dynamic Normalization', 
-                'Histogram Equalization', 'True Mask']
+                'True Mask', 'Band Histogram']
+        
         for j in range(rows):
             plt.subplot(cols, rows, 5*i+j+1)
-            plt.imshow(results[j], cmap='gray', extent=[0, 1, 0, 1])
+            if labels[j] == 'Band Histogram':
+
+                linear_norm_1d = np.array(linear_norm).ravel()
+                dynamic_world_norm_1d = np.array(dynamic_world_norm).ravel()
+
+                plt.hist([linear_norm_1d, dynamic_world_norm_1d], 
+                         bins = 150,
+                         range = [0.0,1.0],
+                         color = ['green', 'blue'],
+                         label = [ 'linear_norm', 'dynamic_world_norm'],
+                         histtype = 'step',
+                         stacked=True)
+                plt.xlim()
+                plt.ylim()
+                plt.legend()
+            else:
+                plt.imshow(results[j], cmap='gray')
             plt.axis('off')
             plt.title(labels[j])
             

@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import spectral
 import spectral.io.envi as envi 
 import torch.nn.functional as F
+import warnings
+warnings.filterwarnings('ignore')
 
 from glob import glob
 from typing import Any
@@ -55,9 +57,9 @@ def visualize_train(
     original_img_cpu = original_img[0].cpu().numpy()
     pred_mask_binary = F.sigmoid(pred_mask[0, 0]) > 0.5
 
-    band_1 = original_img_cpu[0,:,:] * 255
-    band_2 = original_img_cpu[1,:,:] * 255
-    band_3 = original_img_cpu[2,:,:] * 255
+    band_1 = original_img_cpu[0,:,:] 
+    band_2 = original_img_cpu[1,:,:] 
+    band_3 = original_img_cpu[2,:,:] 
     pred = pred_mask_binary.cpu().numpy() * 255
     true = true_mask[0, 0].cpu().numpy() * 255
     overlay = np.multiply(pred, true)
@@ -66,32 +68,32 @@ def visualize_train(
 
     # 
     plt.subplot(2, 3, 1)
-    plt.imshow(band_1, cmap='gray', extent=[0, 1, 0, 1])
+    plt.imshow(band_1, cmap='gray')
     plt.title('Band 1')
 
     # 
     plt.subplot(2, 3, 2)
-    plt.imshow(band_2, cmap='gray', extent=[0, 1, 0, 1])
+    plt.imshow(band_2, cmap='gray')
     plt.title('Band 2')
 
     # Pixel accuracy
     plt.subplot(2, 3, 3)
-    plt.imshow(band_3, cmap='gray', extent=[0, 1, 0, 1])
+    plt.imshow(band_3, cmap='gray')
     plt.title('Band 3')
 
     # Prediction
     plt.subplot(2, 3, 4)
-    plt.imshow(pred, cmap='gray', extent=[0, 1, 0, 1])
+    plt.imshow(pred, cmap='gray')
     plt.title('Prediction')
 
     # True Mask
     plt.subplot(2, 3, 5)
-    plt.imshow(true, cmap='gray', extent=[0, 1, 0, 1])
+    plt.imshow(true, cmap='gray')
     plt.title('True Mask')
 
     # Overlay
     plt.subplot(2, 3, 6)
-    plt.imshow(overlay, cmap='gray', extent=[0, 1, 0, 1])
+    plt.imshow(overlay, cmap='gray')
     plt.title('Overlay')
 
     plt.savefig(os.path.join(img_save_path, 'Training_result_epoch_{}_iter_{}.png'.format(epoch, iter)))
@@ -235,34 +237,34 @@ def band_norm(band : np.array, norm_type : str):
     Reference : https://medium.com/sentinel-hub/how-to-normalize-satellite-images-for-deep-learning-d5b668c885af
     '''
     SMOOTH = 1e-5
-    band = abs(band)
+
+    if np.any(band < 0):
+        band_abs = band - np.min(band)
+    else:
+        band_abs = band
 
     if norm_type == 'linear_norm':
-        output_band_lower_bound, output_band_upper_bound = SMOOTH, 1  
-        input_band_lower_bound, input_band_upper_bound = np.percentile(band, 10), np.percentile(band, 90)
-        output_band_range = output_band_upper_bound - output_band_lower_bound
+        input_band_lower_bound, input_band_upper_bound = np.percentile(band_abs[band_abs>0], 1), np.percentile(band_abs[band_abs>0], 90)
         input_band_range = input_band_upper_bound - input_band_lower_bound
-        band_norm = (band - input_band_lower_bound) * (output_band_range/(input_band_range+SMOOTH)) + output_band_lower_bound
+
+        band_norm = band_abs / input_band_range  # Percentile Normalization
+        band_norm = (band_norm - np.min(band_norm)) / np.max(band_norm)  # Let Value Range : [0, 1]
 
     elif norm_type == 'dynamic_world_norm':
     
         def sigmoid(x):
-            return 1 / (1 + np.exp(-x))
+            return 1 / (1 + np.exp(-(x+SMOOTH)))
         
-        band_log = np.log1p(band)
+        band_log = np.log1p(band_abs)
+        band_log_for_percentile = np.log1p(band_abs[band_abs>0])
 
-        input_band_lower_bound, input_band_upper_bound = np.percentile(band_log, 30), np.percentile(band_log, 70)
-        band_norm = sigmoid((band_log - input_band_lower_bound) / (input_band_upper_bound - input_band_lower_bound + SMOOTH))
-    
-    elif norm_type == 'hist_eq':
-        flattened_band = band.flatten()
-        hist, bins = np.histogram(flattened_band, bins=40000, range=[0,1])
-        cdf = hist.cumsum()
-        cdf_normalized = cdf / cdf[-1]
-        band_norm = np.interp(flattened_band, bins[:-1], cdf_normalized).reshape(band.shape)
+        input_band_lower_bound, input_band_upper_bound = np.percentile(band_log_for_percentile, 30), np.percentile(band_log_for_percentile, 70)  # Percentile Normalization
+        input_band_range = input_band_upper_bound - input_band_lower_bound
+
+        band_norm = sigmoid((band_log - input_band_lower_bound) / (input_band_range))  # Let Value Range : [0, 1] by Sigmoid Operation
 
     else:
-        raise Exception("norm_type should be one of 'linear_norm', 'dynamic_world_norm', and 'hist_eq'.")
+        raise Exception("norm_type should be one of 'linear_norm', or 'dynamic_world_norm'.")
 
     return band_norm
 
@@ -283,7 +285,7 @@ def read_envi_file(img_path, norm = True):
         data = envi.open(envi_hdr_path, envi_img_path)
         if norm:
             img = np.array(data.load())[:,:,0]
-            img = band_norm(img, 'dynamic_world_norm')
+            img = band_norm(img, 'linear_norm')
         else:
             img = np.array(data.load())[:,:,0]
             
@@ -292,6 +294,7 @@ def read_envi_file(img_path, norm = True):
     return np.array(envi_data)
 
 def find_arrays_with_object(arrays_list):
-    indices_with_one = [index for index, array in enumerate(arrays_list) if np.any(array > 1e-5)]
+    indices_with_one = [index for index, array in enumerate(arrays_list) if np.any(array > 0)]
 
     return indices_with_one
+

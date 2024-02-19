@@ -8,6 +8,7 @@ import traceback
 import torch
 import torch.optim as optim
 import torch.nn as nn
+import torch.nn.functional as F
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -203,7 +204,7 @@ def main(
 
                 # Calculating metrics for training
                 with torch.no_grad():
-                    pred_masks = outputs > 0.5
+                    pred_masks = F.sigmoid(outputs) > 0.5
                     iou_train, dice_coefficient_train, pixel_accuracy_train, f1_train = calculate_metrics(
                         pred_masks, masks
                     )
