@@ -60,9 +60,11 @@ def visualize_train(
     band_1 = original_img_cpu[0,:,:] 
     band_2 = original_img_cpu[1,:,:] 
     band_3 = original_img_cpu[2,:,:] 
-    pred = pred_mask_binary.cpu().numpy() * 255
-    true = true_mask[0, 0].cpu().numpy() * 255
+    pred = pred_mask_binary.cpu().detach().numpy()
+    true = true_mask[0, 0].cpu().detach().numpy()
     overlay = np.multiply(pred, true)
+
+    #print("\nPrediction : \n", pred)
 
     plt.figure(figsize=(28,16))
 
@@ -233,6 +235,7 @@ def band_norm(band : np.array, norm_type : str, value_check : bool):
     1) Negative values are changed to Positive values for deep learning training
     2) norm_type should be one of linear_norm, or dynamic_world_norm
     3) Modify boundary values as necessary
+    4) This code is suited for Input Image which is already Land/Sea Masked(Land value : 0)
 
     Reference : https://medium.com/sentinel-hub/how-to-normalize-satellite-images-for-deep-learning-d5b668c885af
     '''
@@ -240,28 +243,34 @@ def band_norm(band : np.array, norm_type : str, value_check : bool):
 
     if np.any(band < 0):
         band_abs = band - np.min(band)
+        #band_mean = np.mean(band_abs[band_abs != -np.min(band)])
+        #band_abs[band_abs == -np.min(band)] = band_mean
     else:
         band_abs = band
 
     if norm_type == 'linear_norm':
-        input_band_lower_bound, input_band_upper_bound = np.percentile(band_abs[band_abs>0], 1), np.percentile(band_abs[band_abs>0], 90)
+        input_band_lower_bound, input_band_upper_bound = np.percentile(band_abs[band_abs != -np.min(band)], 1), np.percentile(band_abs[band_abs != -np.min(band)], 99)
         input_band_range = input_band_upper_bound - input_band_lower_bound
 
-        band_norm = band_abs / input_band_range  # Percentile Normalization
-        band_norm = (band_norm - np.min(band_norm)) / np.max(band_norm)  # Let Value Range : [0, 1]
+        band_norm = (band_abs - input_band_lower_bound) / input_band_range  # Percentile Normalization
+        band_norm = np.clip((band_norm) / np.max(band_norm), 0, 1)  # Let Value Range : [0, 1]
 
     elif norm_type == 'dynamic_world_norm':
     
         def sigmoid(x):
             return 1 / (1 + np.exp(-(x+SMOOTH)))
-        
+
         band_log = np.log1p(band_abs)
-        band_log_for_percentile = np.log1p(band_abs[band_abs>0])
+        band_log_for_percentile = np.log1p(band_abs[band_abs != -np.min(band)])
+        #band_log_for_percentile = np.log1p(band_abs[band_abs != band_mean])
 
         input_band_lower_bound, input_band_upper_bound = np.percentile(band_log_for_percentile, 30), np.percentile(band_log_for_percentile, 70)  # Percentile Normalization
         input_band_range = input_band_upper_bound - input_band_lower_bound
 
         band_norm = sigmoid((band_log - input_band_lower_bound) / (input_band_range))  # Let Value Range : [0, 1] by Sigmoid Operation
+    
+    elif norm_type == 'mask_norm':
+        band_norm = band_abs / 255.0
 
     else:
         raise Exception("norm_type should be one of 'linear_norm', or 'dynamic_world_norm'.")
@@ -278,17 +287,6 @@ def band_norm(band : np.array, norm_type : str, value_check : bool):
         print('--------------------------------------------------')
 
     return band_norm
-
-""" def terrain_masking(band : np.array, shp_file):
-    '''
-    Replace Terrain Value(0) to mean value of water
-    '''
-    
-    
-    
-    return """
-
-
 
 # Read ENVI file Format
 def read_envi_file(img_path, norm = True, norm_type = 'linear_norm'):
@@ -307,7 +305,7 @@ def read_envi_file(img_path, norm = True, norm_type = 'linear_norm'):
         data = envi.open(envi_hdr_path, envi_img_path)
         if norm:
             img = np.array(data.load())[:,:,0]
-            img = band_norm(img, norm_type, True)
+            img = band_norm(img, norm_type, False)
         else:
             img = np.array(data.load())[:,:,0]
             

@@ -113,9 +113,9 @@ def main(
     model.to(device)
 
     # Loss Function Setting
-    #criterion = DiceLoss()
+    criterion = DiceLoss()
     #criterion = nn.BCELoss()
-    criterion = DiceBCELoss()
+    #criterion = DiceBCELoss()
     #criterion = IoULoss()
     #criterion = FocalLoss()
     #criterion = TverskyLoss()
