@@ -9,7 +9,10 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.transforms as transforms
+import albumentations as A
 
+from albumentations.pytorch import ToTensorV2
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 from dataset import SatelliteDataset
@@ -18,7 +21,7 @@ from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
 from models.transunet import TransUNet
 from loss import DiceLoss, DiceBCELoss, IoULoss, FocalLoss, TverskyLoss
-from utils import visualize_training_log, calculate_metrics, gpu_test, visualize_train
+from utils import visualize_training_log, calculate_metrics, gpu_test, visualize_train, set_seed
 from datetime import datetime
 from scheduler import CosineAnnealingWarmUpRestarts
 
@@ -81,13 +84,21 @@ def main(
     """
     click.secho(message="🚀 Training...", fg="blue", nl=True)
 
+    set_seed(99)
+    custom_transform = A.Compose([
+        #A.Resize(INPUT[0], INPUT[1]),
+        A.Rotate(limit=(-10, 10), p=0.7),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        ToTensorV2(),
+    ])
 
     try:
         train_dataset = SatelliteDataset(
-            data_dir=data_dir, split="train", transform=True
+            data_dir=data_dir, split="train", transform=custom_transform
         )
         val_dataset = SatelliteDataset(
-            data_dir=data_dir, split="val", transform=True
+            data_dir=data_dir, split="val", transform=custom_transform
         )
     except Exception as _:
         click.secho(message="\n❗ Error \n", fg="red")
@@ -186,7 +197,7 @@ def main(
 
                 outputs = model(images)
                 if epoch % 5 == 0:
-                    if iter % 50 == 0:
+                    if iter % 10 == 0:
                         visualize_train(images, outputs, masks, 
                                         img_save_path= 'outputs/train_output', 
                                         epoch = str(epoch), iter = str(iter))

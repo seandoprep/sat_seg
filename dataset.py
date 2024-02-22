@@ -2,7 +2,6 @@ import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import numpy as np
 import torchvision.transforms as transforms
-import random
 
 from typing import Any
 from torch.utils.data import Dataset
@@ -16,7 +15,7 @@ class SatelliteDataset(Dataset):
         split: str = "train",
         val_ratio: float = 0.2,
         test_ratio: float = 0.1,
-        transform : bool = True,
+        transform : transforms = None,
     ) -> None:
         if not os.path.exists(data_dir):
             raise ValueError(f'Provided data_dir: "{data_dir}" does not exist.')
@@ -31,22 +30,13 @@ class SatelliteDataset(Dataset):
         self.test_ratio = test_ratio
         self.transform = transform
 
-        random.seed(99)
-        self.custom_transform = transforms.Compose([
-            transforms.ToTensor(),
-            #transforms.RandomHorizontalFlip(p=0.5),
-            #transforms.RandomVerticalFlip(p=0.5),
-            #transforms.RandomRotation(10),
-        ])
+        #num_samples = len(self.image_list)
+        #indices = list(range(num_samples))
 
-        num_samples = len(self.image_list)
-        indices = list(range(num_samples))
-
-        #indices = find_arrays_with_object(self.mask_list)
-        #num_samples = len(indices)
+        indices = find_arrays_with_object(self.mask_list)
+        num_samples = len(indices)
 
         # Data Split
-        np.random.seed(99)
         np.random.shuffle(indices)
         num_val_samples = int(self.val_ratio * num_samples)
         num_test_sampels = int(self.test_ratio * num_samples)
@@ -71,10 +61,11 @@ class SatelliteDataset(Dataset):
         
         padded_img = np.pad(img, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
         padded_mask = np.pad(mask, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
-        
-        if self.transform == True :
-            processed_img = self.custom_transform(padded_img)
-            processed_mask = self.custom_transform(padded_mask)
+
+        if self.transform:
+            augmentations = self.transform(image=padded_img, mask=padded_mask)
+            processed_img = augmentations["image"]
+            processed_mask = augmentations["mask"]
         else:
             processed_img = transforms.ToTensor(padded_img)
             processed_mask = transforms.ToTensor(padded_mask)

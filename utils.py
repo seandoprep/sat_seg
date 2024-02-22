@@ -4,7 +4,7 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import torch
 import numpy as np
 import pandas as pd
-import cv2
+import random
 import matplotlib.pyplot as plt
 import spectral
 import spectral.io.envi as envi 
@@ -61,7 +61,8 @@ def visualize_train(
     band_2 = original_img_cpu[1,:,:] 
     band_3 = original_img_cpu[2,:,:] 
     pred = pred_mask_binary.cpu().detach().numpy()
-    true = true_mask[0, 0].cpu().detach().numpy()
+    pred = np.expand_dims(pred, axis=2)
+    true = true_mask[0].cpu().detach().numpy()
     overlay = np.multiply(pred, true)
 
     #print("\nPrediction : \n", pred)
@@ -236,7 +237,8 @@ def band_norm(band : np.array, norm_type : str, value_check : bool):
     2) norm_type should be one of linear_norm, or dynamic_world_norm
     3) Modify boundary values as necessary
     4) This code is suited for Input Image which is already Land/Sea Masked(Land value : 0)
-
+     
+    Need to add z-score, std normalization
     Reference : https://medium.com/sentinel-hub/how-to-normalize-satellite-images-for-deep-learning-d5b668c885af
     '''
     SMOOTH = 1e-5
@@ -318,3 +320,14 @@ def find_arrays_with_object(arrays_list):
 
     return indices_with_one
 
+# Randomness Control
+def set_seed(random_seed : int):
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed) # if use multi-GPU
+    np.random.seed(random_seed)
+    random.seed(random_seed)
+
+    # We can fully control randomness, but speed will be slow
+    #torch.backends.cudnn.deterministic = True
+    #torch.backends.cudnn.benchmark = False

@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt 
 import click
 
-from utils import pad_crop, read_envi_file, find_arrays_with_object
+from utils import pad_crop, read_envi_file, find_arrays_with_object, set_seed
 
 @click.command()
 @click.option("-D", "--data-dir", type=str, default='data\\Train\\ENVI', help="Path for Data Directory")
@@ -25,6 +25,8 @@ def main(
     mask_dir = os.path.join(data_dir, "Mask")
     band_labels = ['FAI', 'NDCI', 'NDWI']
 
+    set_seed(99)
+
     if viz_type == 'cropped':
         # Read Image, Mask
         linear_norm_list = pad_crop(read_envi_file(image_dir, True, 'linear_norm'), 224)
@@ -36,7 +38,6 @@ def main(
         indices = find_arrays_with_object(mask_list)
         print(len(indices))
 
-        np.random.seed(18)
         np.random.shuffle(indices)
         sample = indices[4]
 
