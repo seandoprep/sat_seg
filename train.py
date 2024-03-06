@@ -288,6 +288,7 @@ def main(
             scheduler.step(val_loss)
 
             print(
+                f"{'-'*50}"
                 f"\nEpoch {epoch + 1}/{num_epochs}\n"
                 f"Avg Train Loss: {train_loss:.4f}\n"
                 f"Avg Validation Loss: {val_loss:.4f}\n"

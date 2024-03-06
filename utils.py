@@ -261,19 +261,69 @@ def pad_crop(original_array : np.ndarray, split_size : int):
     stride_height = padded_height // split_size
     stride_width = padded_width // split_size
 
+    50
+    50
+
     # Cropping
     cropped_images = []
     for i in range(stride_height):
         for j in range(stride_width):
-            start_x = i * split_size
-            start_y = j * split_size
-            end_x = start_x + split_size
+            start_y = i * split_size
+            start_x = j * split_size
             end_y = start_y + split_size
+            end_x = start_x + split_size
 
-            cropped_image = padded_array[:, start_x:end_x, start_y:end_y]
+            cropped_image = padded_array[:, start_y:end_y, start_x:end_x]
             cropped_images.append(cropped_image)
 
     return np.array(cropped_images)
+
+
+# Unpadding
+def unpad(padded_array : np.ndarray, pad_length : int):
+    '''
+    Unpad 2d padded image
+    '''
+    # Unpadding
+    height, width = padded_array.shape
+    unpadded_array = padded_array[pad_length:height-pad_length, pad_length:width-pad_length]
+
+    return unpadded_array
+
+
+# Restoring image
+def restore_img(image_list : list, original_height : int, original_width : int, split_size : int):
+    '''
+    Restore Image by stitching cropped images
+    '''
+    # Calculate image number per row and column
+    X_num = original_width // split_size + 1
+    Y_num = original_height// split_size + 1
+
+    print('X NUM, Y NUM : ', str(X_num), str(Y_num))
+
+    pad_x = split_size * (X_num) - original_width
+    pad_y = split_size * (Y_num) - original_height
+
+    print('pad x, pad y : ', str(pad_x), str(pad_y))
+
+    zero_array = np.zeros((original_height+pad_y, original_width+pad_x))
+
+    print('Image Array Shape : ', str(zero_array.shape))
+
+    for i in range(Y_num):
+        for j in range(X_num):
+            start_y = i * split_size
+            start_x = j * split_size
+            end_y = start_y + split_size
+            end_x = start_x + split_size
+            zero_array[start_y:end_y, start_x:end_x] = image_list[i * X_num + j] 
+
+    restored_img = zero_array[:-pad_y, :-pad_x]
+    print(np.array(restored_img).shape)
+
+    return restored_img
+
 
 # Band Normalization
 def band_norm(band : np.array, norm_type : str, value_check : bool):
