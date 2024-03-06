@@ -34,6 +34,17 @@ class SatelliteDataset(Dataset):
         #indices = list(range(num_samples))
 
         indices = find_arrays_with_object(self.mask_list)
+        
+        #cnt = 0
+        #for num in range(len(self.image_list)):   
+        #    cnt += 1 
+        #    if num in indices:
+        #        pass
+        #    else:
+        #        indices.append(num)    
+        #    if cnt == 100:
+        #        break
+
         num_samples = len(indices)
 
         # Data Split

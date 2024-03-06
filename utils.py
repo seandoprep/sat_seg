@@ -63,7 +63,6 @@ def visualize_train(
     pred = pred_mask_binary.cpu().detach().numpy()
     pred = np.expand_dims(pred, axis=2)
     true = true_mask[0].cpu().detach().numpy()
-    overlay = np.multiply(pred, true)
 
     #print("\nPrediction : \n", pred)
 
@@ -94,13 +93,62 @@ def visualize_train(
     plt.imshow(true, cmap='gray')
     plt.title('True Mask')
 
-    # Overlay
-    plt.subplot(2, 3, 6)
-    plt.imshow(overlay, cmap='gray')
-    plt.title('Overlay')
-
     plt.savefig(os.path.join(img_save_path, 'Training_result_epoch_{}_iter_{}.png'.format(epoch, iter)))
     plt.close()
+
+
+def visualize_test( 
+        original_img: Any,
+        pred_mask: Any,
+        true_mask: Any,
+        img_save_path : str,
+        num : int
+        ) -> None:
+    '''
+    Visualize test process per image and Save it.
+    '''
+    original_img_cpu = original_img[0].cpu().numpy()
+    pred_mask_binary = F.sigmoid(pred_mask[0, 0]) > 0.5
+
+    band_1 = original_img_cpu[0,:,:] 
+    band_2 = original_img_cpu[1,:,:] 
+    band_3 = original_img_cpu[2,:,:] 
+    pred = pred_mask_binary.cpu().detach().numpy()
+    pred = np.expand_dims(pred, axis=2)
+    true = true_mask[0].cpu().detach().numpy()
+
+    #print("\nPrediction : \n", pred)
+
+    plt.figure(figsize=(28,16))
+
+    # 
+    plt.subplot(2, 3, 1)
+    plt.imshow(band_1, cmap='gray')
+    plt.title('Band 1')
+
+    # 
+    plt.subplot(2, 3, 2)
+    plt.imshow(band_2, cmap='gray')
+    plt.title('Band 2')
+
+    # Pixel accuracy
+    plt.subplot(2, 3, 3)
+    plt.imshow(band_3, cmap='gray')
+    plt.title('Band 3')
+
+    # Prediction
+    plt.subplot(2, 3, 4)
+    plt.imshow(pred, cmap='gray')
+    plt.title('Prediction')
+
+    # True Mask
+    plt.subplot(2, 3, 5)
+    plt.imshow(true, cmap='gray')
+    plt.title('True Mask')
+
+    plt.savefig(os.path.join(img_save_path, 'Test_result_{}.png'.format(num)))
+    plt.close()
+
 
 def visualize_training_log(training_logs_csv: str, img_save_path: str):
     '''
@@ -245,8 +293,8 @@ def band_norm(band : np.array, norm_type : str, value_check : bool):
 
     if np.any(band < 0):
         band_abs = band - np.min(band)
-        #band_mean = np.mean(band_abs[band_abs != -np.min(band)])
-        #band_abs[band_abs == -np.min(band)] = band_mean
+        band_mean = np.mean(band_abs[band_abs != -np.min(band)])
+        band_abs[band_abs == -np.min(band)] = band_mean
     else:
         band_abs = band
 
@@ -328,6 +376,6 @@ def set_seed(random_seed : int):
     np.random.seed(random_seed)
     random.seed(random_seed)
 
-    # We can fully control randomness, but speed will be slow
+    #We can fully control randomness, but speed will be slow
     #torch.backends.cudnn.deterministic = True
     #torch.backends.cudnn.benchmark = False

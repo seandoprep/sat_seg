@@ -58,7 +58,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "--batch-size",
     type=int,
     default=5,
-    help="Batch size of data for training. Default - 16",
+    help="Batch size of data for training. Default - 8",
 )
 @click.option(
     "-S",
@@ -86,7 +86,6 @@ def main(
 
     set_seed(99)
     custom_transform = A.Compose([
-        #A.Resize(INPUT[0], INPUT[1]),
         A.Rotate(limit=(-10, 10), p=0.7),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
@@ -142,7 +141,7 @@ def main(
     scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=150, T_mult=1, eta_max=0.1,  T_up=10, gamma=0.5)
 
     # For Early-Stopping
-    patience_epochs = 10
+    patience_epochs = 30
     no_improvement_epochs = 0
 
     # Logging
@@ -196,11 +195,11 @@ def main(
                 optimizer.zero_grad()
 
                 outputs = model(images)
-                if epoch % 5 == 0:
+                if epoch % 10 == 0:
                     if iter % 10 == 0:
                         visualize_train(images, outputs, masks, 
-                                        img_save_path= 'outputs/train_output', 
-                                        epoch = str(epoch), iter = str(iter))
+                                    img_save_path= 'outputs/train_output', 
+                                    epoch = str(epoch), iter = str(iter))
                         click.echo(
                             f"\n{click.style(text=f'Saved Train Process', fg='green')}\t{click.style(text=f'Epoch : ', fg='green')}{str(epoch)}\t{click.style(text=f'Iter : ', fg='green')}{str(iter)}"
                             )
