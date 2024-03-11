@@ -3,11 +3,11 @@ import os
 import matplotlib.pyplot as plt 
 import click
 
-from utils import pad_crop, read_envi_file, find_arrays_with_object, set_seed
+from utils.util import pad_crop, read_envi_file, find_arrays_with_object, set_seed
 
 @click.command()
 @click.option("-D", "--data-dir", type=str, default='data\\Train\\ENVI', help="Path for Data Directory")
-@click.option("-T", "--viz-type", type=str, default='band_histogram', help="Visualize Type")
+@click.option("-T", "--viz-type", type=str, default='cropped', help="Visualize Type")
 
 
 def main(

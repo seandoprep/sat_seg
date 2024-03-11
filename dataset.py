@@ -5,7 +5,7 @@ import torchvision.transforms as transforms
 
 from typing import Any
 from torch.utils.data import Dataset
-from utils import pad_crop, read_envi_file, find_arrays_with_object
+from utils.util import pad_crop, read_envi_file, find_arrays_with_object
 
 
 class SatelliteDataset(Dataset):
@@ -35,15 +35,15 @@ class SatelliteDataset(Dataset):
 
         indices = find_arrays_with_object(self.mask_list)
         
-        #cnt = 0
-        #for num in range(len(self.image_list)):   
-        #    cnt += 1 
-        #    if num in indices:
-        #        pass
-        #    else:
-        #        indices.append(num)    
-        #    if cnt == 100:
-        #        break
+        cnt = 0
+        for num in range(len(self.image_list)):   
+            cnt += 1 
+            if num in indices:
+                pass
+            else:
+                indices.append(num)    
+            if cnt == 25:
+                break
 
         num_samples = len(indices)
 
@@ -109,8 +109,8 @@ class InferenceDataset(Dataset):
         img = self.image_list[img_idx]
         mask = self.mask_list[img_idx]
         
-        padded_img = np.pad(img, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
-        padded_mask = np.pad(mask, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
+        padded_img = np.pad(img, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2).swapaxes(0,1)
+        padded_mask = np.pad(mask, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2).swapaxes(0,1)
 
         if self.transform:
             augmentations = self.transform(image=padded_img, mask=padded_mask)

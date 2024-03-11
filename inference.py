@@ -6,6 +6,8 @@ import click
 import traceback
 import albumentations as A
 import numpy as np
+import torch.nn.functional as F
+
 from tqdm import tqdm
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import DataLoader
@@ -14,12 +16,9 @@ from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
 from models.transunet import TransUNet
 from dataset import InferenceDataset
-from utils import set_seed, gpu_test, unpad, read_envi_file, restore_img, pad_crop
+from utils.util import set_seed, gpu_test, unpad, read_envi_file, restore_img
 from datetime import datetime
 from PIL import Image
-
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
 
 
 INPUT_CHANNEL_NUM = 3
@@ -33,7 +32,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-M",
     "--model-name",
     type=str,
-    default='deeplabv3plus',
+    default='resunetplusplus',
     help="Choose models for Binary Segmentation. unet, deeplabv3plus, resunetplusplus, and transunet are now available.",
 )
 @click.option(
@@ -123,8 +122,6 @@ def main(
 
             outputs = model(images)
             
-            #for img_num in range(batch_size):
-            #pred_mask_binary = F.sigmoid(outputs[img_num].squeeze()) > 0.5
             pred_mask_binary = F.sigmoid(outputs[0].squeeze()) > 0.5
             pred_mask_np = pred_mask_binary.cpu().detach().numpy()
             pred_mask_np = unpad(pred_mask_np, pad_length)

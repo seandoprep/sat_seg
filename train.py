@@ -7,9 +7,6 @@ import click
 import traceback
 import torch
 import torch.optim as optim
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.transforms as transforms
 import albumentations as A
 
 from albumentations.pytorch import ToTensorV2
@@ -21,7 +18,9 @@ from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
 from models.transunet import TransUNet
 from loss import DiceLoss, DiceBCELoss, IoULoss, FocalLoss, TverskyLoss
-from utils import visualize_training_log, calculate_metrics, gpu_test, visualize_train, set_seed
+from utils.util import gpu_test, set_seed
+from utils.metrics import calculate_metrics
+from utils.visualize import visualize_training_log, calculate_metrics, visualize_train
 from datetime import datetime
 from scheduler import CosineAnnealingWarmUpRestarts
 
@@ -36,14 +35,14 @@ CLASSES = 1  # For Binary Segmentatoin
     "-M",
     "--model-name",
     type=str,
-    default='deeplabv3plus',
+    default='resunetplusplus',
     help="Choose models for Binary Segmentation. unet, deeplabv3plus, resunetplusplus, and transunet are now available",
 )
 @click.option(
     "-E",
     "--num-epochs",
     type=int,
-    default=100,
+    default=200,
     help="Number of epochs to train the model for. Default - 100",
 )
 @click.option(
@@ -141,7 +140,7 @@ def main(
     scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=150, T_mult=1, eta_max=0.1,  T_up=10, gamma=0.5)
 
     # For Early-Stopping
-    patience_epochs = 30
+    patience_epochs = 40
     no_improvement_epochs = 0
 
     # Logging
@@ -195,14 +194,14 @@ def main(
                 optimizer.zero_grad()
 
                 outputs = model(images)
-                if epoch % 10 == 0:
-                    if iter % 10 == 0:
-                        visualize_train(images, outputs, masks, 
-                                    img_save_path= 'outputs/train_output', 
-                                    epoch = str(epoch), iter = str(iter))
-                        click.echo(
-                            f"\n{click.style(text=f'Saved Train Process', fg='green')}\t{click.style(text=f'Epoch : ', fg='green')}{str(epoch)}\t{click.style(text=f'Iter : ', fg='green')}{str(iter)}"
-                            )
+                if epoch % 20 == 0:
+                    #if iter % 10 == 0:
+                    visualize_train(images, outputs, masks, 
+                                img_save_path= 'outputs/train_output', 
+                                epoch = str(epoch), iter = str(iter))
+                    #click.echo(
+                    #    f"\n{click.style(text=f'Saved Train Process', fg='green')}\t{click.style(text=f'Epoch : ', fg='green')}{str(epoch)}\t{click.style(text=f'Iter : ', fg='green')}{str(iter)}"
+                    #    )
 
                 t_loss = criterion(outputs, masks)
 

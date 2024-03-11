@@ -1,10 +1,12 @@
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
 import sys
 import torch
 import click
 import traceback
 import albumentations as A
+
 from tqdm import tqdm
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import DataLoader
@@ -13,7 +15,9 @@ from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
 from models.transunet import TransUNet
 from dataset import SatelliteDataset
-from utils import set_seed, gpu_test, calculate_metrics, visualize_test
+from utils.util import set_seed, gpu_test
+from utils.metrics import calculate_metrics
+from utils.visualize import visualize_test
 from datetime import datetime
 
 INPUT_CHANNEL_NUM = 3
