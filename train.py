@@ -20,7 +20,7 @@ from models.transunet import TransUNet
 from loss import DiceLoss, DiceBCELoss, IoULoss, FocalLoss, TverskyLoss
 from utils.util import gpu_test, set_seed
 from utils.metrics import calculate_metrics
-from utils.visualize import visualize_training_log, calculate_metrics, visualize_train
+from utils.visualize import visualize_training_log, visualize_train
 from datetime import datetime
 from scheduler import CosineAnnealingWarmUpRestarts
 
@@ -42,7 +42,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-E",
     "--num-epochs",
     type=int,
-    default=200,
+    default=300,
     help="Number of epochs to train the model for. Default - 100",
 )
 @click.option(
@@ -140,7 +140,7 @@ def main(
     scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=150, T_mult=1, eta_max=0.1,  T_up=10, gamma=0.5)
 
     # For Early-Stopping
-    patience_epochs = 40
+    patience_epochs = 50
     no_improvement_epochs = 0
 
     # Logging

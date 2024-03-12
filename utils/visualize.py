@@ -192,3 +192,14 @@ def visualize_training_log(training_logs_csv: str, img_save_path: str):
 
     plt.savefig(os.path.join(img_save_path, 'Training_log.png'))
     plt.close()
+
+
+def compare_result(prediction : np.array, true_mask : np.array):
+    '''
+    Compare Prediction and True Mask.
+    '''
+    result = np.zeros((prediction.shape[0], prediction.shape[1], 3))
+    result[:,:,0] = prediction
+    result[:,:,2] = true_mask[0]
+
+    return result

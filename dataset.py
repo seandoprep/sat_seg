@@ -42,7 +42,7 @@ class SatelliteDataset(Dataset):
                 pass
             else:
                 indices.append(num)    
-            if cnt == 25:
+            if cnt == 200:
                 break
 
         num_samples = len(indices)
@@ -70,8 +70,8 @@ class SatelliteDataset(Dataset):
         img = self.image_list[img_idx]
         mask = self.mask_list[img_idx]
         
-        padded_img = np.pad(img, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
-        padded_mask = np.pad(mask, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2)
+        padded_img = np.pad(img, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2).swapaxes(0,1)
+        padded_mask = np.pad(mask, ((0,0),(16,16),(16,16)), 'constant', constant_values=0).swapaxes(0,2).swapaxes(0,1)
 
         if self.transform:
             augmentations = self.transform(image=padded_img, mask=padded_mask)

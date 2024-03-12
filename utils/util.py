@@ -7,10 +7,8 @@ import random
 import spectral.io.envi as envi 
 import warnings
 warnings.filterwarnings('ignore')
-import geopandas as gpd
 
 from glob import glob
-from shapely.geometry import Point
 
 
 def pad_crop(original_array : np.ndarray, split_size : int):
@@ -23,18 +21,17 @@ def pad_crop(original_array : np.ndarray, split_size : int):
     X_num = original_width // split_size + 1
     Y_num = original_height // split_size + 1
 
-    print('Padding X NUM, Y NUM : ', str(X_num), str(Y_num))
+    #print('Padding X NUM, Y NUM : ', str(X_num), str(Y_num))
 
     pad_x = (split_size * (X_num)) - original_width
     pad_y = (split_size * (Y_num)) - original_height
 
-    print('Padding pad x, pad y : ', str(pad_x), str(pad_y))
+    #print('Padding pad x, pad y : ', str(pad_x), str(pad_y))
 
     padded_array = np.pad(original_array, ((0,0),(0,pad_y),(0,pad_x)), 'constant', constant_values=0)
-    padded_channel, padded_height, padded_width = padded_array.shape
 
-    print('Padding Channel : ', str(padded_channel))
-    print('Padding Image Shape : ', str(padded_array.shape))
+    #print('Padding Channel : ', str(padded_array.shape[0]))
+    #print('Padding Image Shape : ', str(padded_array.shape))
 
     # Cropping
     cropped_images = []
@@ -70,16 +67,16 @@ def restore_img(image_list : list, original_height : int, original_width : int, 
     X_num = original_width // split_size + 1
     Y_num = original_height // split_size + 1
 
-    print('Restoring X NUM, Y NUM : ', str(X_num), str(Y_num))
+    #print('Restoring X NUM, Y NUM : ', str(X_num), str(Y_num))
 
     pad_x = (split_size * (X_num)) - original_width
     pad_y = (split_size * (Y_num)) - original_height
 
-    print('Restoring pad x, pad y : ', str(pad_x), str(pad_y))
+    #print('Restoring pad x, pad y : ', str(pad_x), str(pad_y))
 
     zero_array = np.zeros((original_height+pad_y, original_width+pad_x))
 
-    print('Restoring Image Shape : ', str(zero_array.shape))
+    #print('Restoring Image Shape : ', str(zero_array.shape))
 
     for i in range(Y_num):
         for j in range(X_num):
@@ -90,7 +87,7 @@ def restore_img(image_list : list, original_height : int, original_width : int, 
             zero_array[start_y:end_y, start_x:end_x] = image_list[i * X_num + j] 
 
     restored_img = zero_array[:-pad_y, :-pad_x]
-    print(np.array(restored_img).shape)
+    #print(np.array(restored_img).shape)
 
     return restored_img
 

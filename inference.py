@@ -17,8 +17,10 @@ from models.resunetplusplus import ResUnetPlusPlus
 from models.transunet import TransUNet
 from dataset import InferenceDataset
 from utils.util import set_seed, gpu_test, unpad, read_envi_file, restore_img
+from utils.visualize import compare_result
 from datetime import datetime
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = None
 
 
 INPUT_CHANNEL_NUM = 3
@@ -55,7 +57,7 @@ def main(
     model_path : str,
     batch_size : int) -> None:
     """
-    Inference Script for DeepLabV3+ with ResNet50 Encoder for Binary Segmentation.\n
+    Inference & Comapring Script for DeepLabV3+ with ResNet50 Encoder for Binary Segmentation.\n
     Please make sure your evaluation data is structured according to the folder structure specified in the Github Repository.\n
     See: https://github.com/mukund-ks/DeepLabV3Plus-PyTorch
 
@@ -133,7 +135,22 @@ def main(
     img = Image.fromarray(restored_img)
     img.save((os.path.join(inference_output_dir, 'Inference_output.jpg')), 'JPEG')
 
-    click.secho(message="🎉 Inference Done!", fg="blue")
+    # Compare Images
+    prediction_path = os.path.join(inference_output_dir, 'Inference_output.jpg')
+
+    prediction = Image.open(prediction_path)
+    prediction_np = np.array(prediction)
+
+    true_mask_path = 'data\Train\ENVI\Mask'
+    true_mask_np = read_envi_file(true_mask_path, None, None)
+
+    result = compare_result(prediction_np, true_mask_np)
+    img_np = np.array(result, np.uint8)
+    img = Image.fromarray(img_np)
+    img.save((os.path.join(inference_output_dir, 'Compare_output.jpg')), 'JPEG')
+
+
+    click.secho(message="🎉 Inference and Comparison Done!", fg="blue")
     return
 
 if __name__ == "__main__":
