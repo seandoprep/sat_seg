@@ -7,6 +7,7 @@ import traceback
 import albumentations as A
 import numpy as np
 import torch.nn.functional as F
+import xarray as xr
 
 from tqdm import tqdm
 from albumentations.pytorch import ToTensorV2
@@ -14,7 +15,7 @@ from torch.utils.data import DataLoader
 from models.deeplabv3plus import DeepLabV3Plus
 from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
-from models.transunet import TransUNet
+from models.mdoaunet import MDOAU_net
 from dataset import InferenceDataset
 from utils.util import set_seed, gpu_test, unpad, read_envi_file, restore_img
 from utils.visualize import compare_result
@@ -34,7 +35,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-M",
     "--model-name",
     type=str,
-    default='resunetplusplus',
+    default='mdoaunet',
     help="Choose models for Binary Segmentation. unet, deeplabv3plus, resunetplusplus, and transunet are now available.",
 )
 @click.option(
@@ -83,13 +84,13 @@ def main(
 
     # Defining Model(Only channel 1 or 3 img data can be used)
     if model_name == 'unet':
-        model = UNet(in_channels=3, num_classes=CLASSES)  # Can handle 1, 3 channel img data
+        model = UNet(in_channels=INPUT_CHANNEL_NUM, num_classes=CLASSES)  # Can handle 1, 3 channel img data
     elif model_name == 'deeplabv3plus':
         model = DeepLabV3Plus(num_classes=CLASSES)  # Only handle 3 channel img data because of pretrained backbone
     elif model_name == 'resunetplusplus':
-        model = ResUnetPlusPlus(in_channels=3, num_classes = CLASSES)  # Can handle 1, 3 channel img data
-    elif model_name == 'transunet':
-        model = TransUNet(256, 3, 128, 4, 512, 8, 16, CLASSES)  # Can handle 1, 3 channel img data
+        model = ResUnetPlusPlus(in_channels=INPUT_CHANNEL_NUM, num_classes = CLASSES)  # Can handle 1, 3 channel img data
+    elif model_name == 'mdoaunet':
+        model = MDOAU_net(INPUT_CHANNEL_NUM, CLASSES)
 
     # Load Trained Model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -130,10 +131,22 @@ def main(
             image_list.append(pred_mask_np)
 
     # Restore Images
-    restored_img = restore_img(image_list, image_height, image_width, 224)
-    restored_img = np.array(restored_img, np.uint8) * 255
+    restored = restore_img(image_list, image_height, image_width, 224)
+    restored_img = np.array(restored, np.uint8) * 255
     img = Image.fromarray(restored_img)
     img.save((os.path.join(inference_output_dir, 'Inference_output.jpg')), 'JPEG')
+
+    # Save into NC images
+    #lon = np.arange(127.901,129.106, (129.106-127.901)/10983)
+    #lat = np.arange(34.253,35.238, (35.238-34.253)/13415)
+    #latitude = xr.DataArray(lat, dims='lat', attrs={'units': 'degrees_north'})
+    #longitude = xr.DataArray(lon, dims='lon', attrs={'units': 'degrees_east'})
+    #restored_np = np.array(restored, np.int64)
+
+    #df = xr.DataArray(restored_np, dims=('lat', 'lon'))
+    #df = df.assign_coords(lat=latitude, lon=longitude)
+    #inference_ds = xr.Dataset({'infernece' : df})
+    #inference_ds.to_netcdf((os.path.join(inference_output_dir,'inference.nc')))
 
     # Compare Images
     prediction_path = os.path.join(inference_output_dir, 'Inference_output.jpg')

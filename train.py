@@ -8,6 +8,10 @@ import traceback
 import torch
 import torch.optim as optim
 import albumentations as A
+import gc
+
+gc.collect()
+torch.cuda.empty_cache()
 
 from albumentations.pytorch import ToTensorV2
 from tqdm import tqdm
@@ -16,15 +20,17 @@ from dataset import SatelliteDataset
 from models.deeplabv3plus import DeepLabV3Plus
 from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
-from models.transunet import TransUNet
-from loss import DiceLoss, DiceBCELoss, IoULoss, FocalLoss, TverskyLoss
+from models.mdoaunet import MDOAU_net
+from models.fsnet import FSNet
+
+from loss import DiceLoss, DiceBCELoss, IoULoss, FocalLoss, TverskyLoss, ShapeConstrainedLoss
 from utils.util import gpu_test, set_seed
 from utils.metrics import calculate_metrics
 from utils.visualize import visualize_training_log, visualize_train
 from datetime import datetime
 from scheduler import CosineAnnealingWarmUpRestarts
 
-INPUT_CHANNEL_NUM = 3
+INPUT_CHANNEL_NUM = 5
 INPUT = (256, 256)
 CLASSES = 1  # For Binary Segmentatoin
 
@@ -35,8 +41,8 @@ CLASSES = 1  # For Binary Segmentatoin
     "-M",
     "--model-name",
     type=str,
-    default='resunetplusplus',
-    help="Choose models for Binary Segmentation. unet, deeplabv3plus, resunetplusplus, and transunet are now available",
+    default='mdoaunet',
+    help="Choose models for Binary Segmentation. unet, deeplabv3plus, resunetplusplus, and mdoaunet are now available",
 )
 @click.option(
     "-E",
@@ -56,7 +62,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-B",
     "--batch-size",
     type=int,
-    default=5,
+    default=8,
     help="Batch size of data for training. Default - 8",
 )
 @click.option(
@@ -108,14 +114,16 @@ def main(
 
     # Defining Model(Only channel 1 or 3 img data can be used)
     if model_name == 'unet':
-        model = UNet(in_channels=3, num_classes=CLASSES)  # Can handle 1, 3 channel img data
+        model = UNet(in_channels=INPUT_CHANNEL_NUM, num_classes=CLASSES)
     elif model_name == 'deeplabv3plus':
-        model = DeepLabV3Plus(num_classes=CLASSES)  # Only handle 3 channel img data because of pretrained backbone
+        model = DeepLabV3Plus(num_classes=CLASSES)
     elif model_name == 'resunetplusplus':
-        model = ResUnetPlusPlus(in_channels=3, num_classes = CLASSES)  # Can handle 1, 3 channel img data
-    elif model_name == 'transunet':
-        model = TransUNet(256, 3, 128, 4, 512, 8, 16, CLASSES)  # Can handle 1, 3 channel img data
-    
+        model = ResUnetPlusPlus(in_channels=INPUT_CHANNEL_NUM, num_classes = CLASSES)
+    elif model_name == 'mdoaunet':
+        model = MDOAU_net(INPUT_CHANNEL_NUM, CLASSES)
+    elif model_name == 'fsnet':
+        model = FSNet(INPUT_CHANNEL_NUM, CLASSES)
+
     # Check GPU Availability
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     gpu_test()
@@ -128,6 +136,7 @@ def main(
     #criterion = IoULoss()
     #criterion = FocalLoss()
     #criterion = TverskyLoss()
+    #criterion = ShapeConstrainedLoss()
 
     # Optimizer & Scheduler    
     #optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-6)
@@ -153,8 +162,10 @@ def main(
         "Avg IoU Val",
         "Avg Pix Acc Train",
         "Avg Pix Acc Val",
-        "Avg Dice Coeff Train",
-        "Avg Dice Coeff Val",
+        "Avg Precision Train",
+        "Avg Precision Val",
+        "Avg Recall Train",
+        "Avg Recall Val",
         "Avg F1 Train",
         "Avg F1 Val",
         "Learning Rate",
@@ -178,7 +189,8 @@ def main(
             train_loss = 0.0
             total_iou_train = 0.0
             total_pixel_accuracy_train = 0.0
-            total_dice_coefficient_train = 0.0
+            total_precision_train = 0.0
+            total_recall_train = 0.0
             total_f1_train = 0.0
 
             train_dataloader = tqdm(
@@ -192,9 +204,15 @@ def main(
                 images, masks = images.to(device), masks.to(device)
 
                 optimizer.zero_grad()
-
+                
                 outputs = model(images)
-                if epoch % 20 == 0:
+
+                ### fsnet ###
+                #outputs, encoded_pred_mask, decoded_pred_mask, encoded_true_mask, decoded_true_mask = model(images, masks)
+
+                ### fsnet ###
+
+                if epoch % 50 == 0:
                     #if iter % 10 == 0:
                     visualize_train(images, outputs, masks, 
                                 img_save_path= 'outputs/train_output', 
@@ -204,6 +222,8 @@ def main(
                     #    )
 
                 t_loss = criterion(outputs, masks)
+                #t_loss = criterion(pred_mask, masks, encoded_pred_mask, encoded_true_mask,
+                #                   decoded_pred_mask, decoded_true_mask, 0.1, 0.1)
 
                 t_loss.backward()
                 optimizer.step()
@@ -214,13 +234,14 @@ def main(
                 # Calculating metrics for training
                 with torch.no_grad():
                     pred_masks = outputs > 0.5
-                    iou_train, dice_coefficient_train, pixel_accuracy_train, f1_train = calculate_metrics(
+                    iou_train, pixel_accuracy_train, precision_train, recall_train, f1_train = calculate_metrics(
                         pred_masks, masks
                     )
 
                     total_iou_train += iou_train
-                    total_dice_coefficient_train += dice_coefficient_train
                     total_pixel_accuracy_train += pixel_accuracy_train
+                    total_precision_train += precision_train
+                    total_recall_train += recall_train
                     total_f1_train += f1_train
 
                 # Displaying metrics in the progress bar description
@@ -228,7 +249,8 @@ def main(
                     loss=t_loss.item(),
                     train_iou=iou_train,
                     train_pix_acc=pixel_accuracy_train,
-                    train_dice_coef=dice_coefficient_train,
+                    train_precision=precision_train,
+                    train_recall=recall_train,
                     train_f1=f1_train,
                     lr=current_lr,
                 )
@@ -236,7 +258,8 @@ def main(
             train_loss /= len(train_dataloader)
             avg_iou_train = total_iou_train / len(train_dataloader)
             avg_pixel_accuracy_train = total_pixel_accuracy_train / len(train_dataloader)
-            avg_dice_coefficient_train = total_dice_coefficient_train / len(train_dataloader)
+            avg_precision_train = total_precision_train / len(train_dataloader)
+            avg_recall_train = total_recall_train / len(train_dataloader)
             avg_f1_train = total_f1_train / len(train_dataloader)
 
             # VALIDATION
@@ -244,7 +267,8 @@ def main(
             val_loss = 0.0
             total_iou_val = 0.0
             total_pixel_accuracy_val = 0.0
-            total_dice_coefficient_val = 0.0
+            total_precision_val = 0.0
+            total_recall_val = 0.0
             total_f1_val = 0.0
 
             val_dataloader = tqdm(val_dataloader, desc=f"Validation", unit="batch")
@@ -259,13 +283,14 @@ def main(
 
                     # Calculating metrics for Validation
                     pred_masks = outputs > 0.5
-                    iou_val, dice_coefficient_val, pixel_accuracy_val, f1_val = calculate_metrics(
+                    iou_val, pixel_accuracy_val, precision_val, recall_val, f1_val = calculate_metrics(
                         pred_masks, masks
                     )
 
                     total_iou_val += iou_val
                     total_pixel_accuracy_val += pixel_accuracy_val
-                    total_dice_coefficient_val += dice_coefficient_val
+                    total_precision_val += precision_val
+                    total_recall_val += recall_val
                     total_f1_val += f1_val
 
                     # Displaying metrics in progress bar description
@@ -273,7 +298,8 @@ def main(
                         val_loss=v_loss.item(),
                         val_iou=iou_val,
                         val_pix_acc=pixel_accuracy_val,
-                        val_dice_coef=dice_coefficient_val,
+                        val_precision=precision_val,
+                        val_recall=recall_val,
                         val_f1=f1_val,
                         lr=current_lr,
                     )
@@ -281,7 +307,8 @@ def main(
             val_loss /= len(val_dataloader)
             avg_iou_val = total_iou_val / len(val_dataloader)
             avg_pixel_accuracy_val = total_pixel_accuracy_val / len(val_dataloader)
-            avg_dice_coefficient_val = total_dice_coefficient_val / len(val_dataloader)
+            avg_precision_val = total_precision_val / len(val_dataloader)
+            avg_recall_val = total_recall_val / len(val_dataloader)
             avg_f1_val = total_f1_val / len(val_dataloader)
 
             scheduler.step(val_loss)
@@ -293,10 +320,12 @@ def main(
                 f"Avg Validation Loss: {val_loss:.4f}\n"
                 f"Avg IoU Train: {avg_iou_train:.4f}\n"
                 f"Avg IoU Val: {avg_iou_val:.4f}\n"
-                f"Avg Pix Acc Train: {avg_dice_coefficient_train:.4f}\n"
+                f"Avg Pix Acc Train: {avg_pixel_accuracy_train:.4f}\n"
                 f"Avg Pix Acc Val: {avg_pixel_accuracy_val:.4f}\n"
-                f"Avg Dice Coeff Train: {avg_dice_coefficient_train:.4f}\n"
-                f"Avg Dice Coeff Val: {avg_dice_coefficient_val:.4f}\n"
+                f"Avg Precision Train: {avg_precision_train:.4f}\n"
+                f"Avg Precision Val: {avg_precision_val:.4f}\n"
+                f"Avg Recall Train: {avg_recall_train:.4f}\n"
+                f"Avg Recall Val: {avg_recall_val:.4f}\n"
                 f"Avg F1 Train: {avg_f1_train:.4f}\n"
                 f"Avg F1 Val: {avg_f1_val:.4f}\n"
                 f"Current LR: {current_lr}\n"
@@ -331,8 +360,10 @@ def main(
                     avg_iou_val,
                     avg_pixel_accuracy_train,
                     avg_pixel_accuracy_val,
-                    avg_dice_coefficient_train,
-                    avg_dice_coefficient_val,
+                    avg_precision_train,
+                    avg_precision_val,
+                    avg_recall_train,
+                    avg_recall_val,
                     avg_f1_train,
                     avg_f1_val,
                     current_lr,

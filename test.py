@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 from models.deeplabv3plus import DeepLabV3Plus
 from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
-from models.transunet import TransUNet
+from models.mdoaunet import MDOAU_net
 from dataset import SatelliteDataset
 from utils.util import set_seed, gpu_test
 from utils.metrics import calculate_metrics
@@ -31,7 +31,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-M",
     "--model-name",
     type=str,
-    default='deeplabv3plus',
+    default='mdoaunet',
     help="Choose models for Binary Segmentation. unet, deeplabv3plus, resunetplusplus, and transunet are now available.",
 )
 @click.option(
@@ -77,8 +77,8 @@ def main(
         model = DeepLabV3Plus(num_classes=CLASSES)  # Only handle 3 channel img data because of pretrained backbone
     elif model_name == 'resunetplusplus':
         model = ResUnetPlusPlus(in_channels=3, num_classes = CLASSES)  # Can handle 1, 3 channel img data
-    elif model_name == 'transunet':
-        model = TransUNet(256, 3, 128, 4, 512, 8, 16, CLASSES)  # Can handle 1, 3 channel img data
+    elif model_name == 'mdoaunet':
+        model = MDOAU_net(INPUT_CHANNEL_NUM, CLASSES)
 
 
     # Load Trained Model
@@ -104,7 +104,8 @@ def main(
     # Main loop
     total_iou_test = 0.0
     total_pixel_accuracy_test = 0.0
-    total_dice_coefficient_test = 0.0
+    total_precision_test = 0.0
+    total_recall_test = 0.0
     total_f1_test = 0.0
 
     with torch.no_grad():
@@ -118,33 +119,37 @@ def main(
             visualize_test(image, output, mask, 
                         img_save_path= test_output_dir, num = i)
 
-            iou_test, dice_coefficient_test, pixel_accuracy_test, f1_test = calculate_metrics(
+            iou_test, pixel_accuracy_test, precision_test, recall_test, f1_test = calculate_metrics(
                 pred_mask, mask
             )
 
             total_iou_test += iou_test
             total_pixel_accuracy_test += pixel_accuracy_test
-            total_dice_coefficient_test += dice_coefficient_test
+            total_precision_test += precision_test
+            total_recall_test += recall_test
             total_f1_test += f1_test
         
             # Displaying metrics in the progress bar description
             test_dataloader.set_postfix(
                 test_iou=iou_test,
                 test_pix_acc=pixel_accuracy_test,
-                test_dice_coef=dice_coefficient_test,
+                test_precision=precision_test,
+                test_recall=recall_test,
                 test_f1=f1_test,
             )
 
     avg_iou_test = total_iou_test / len(test_dataloader)
     avg_pixel_accuracy_test = total_pixel_accuracy_test / len(test_dataloader)
-    avg_dice_coefficient_test = total_dice_coefficient_test / len(test_dataloader)
+    avg_precision_test = total_precision_test / len(test_dataloader)
+    avg_recall_test = total_recall_test / len(test_dataloader)
     avg_f1_test = total_f1_test / len(test_dataloader)                
 
     print(
         f"{'-'*50}"
         f"Avg IoU Test: {avg_iou_test:.4f}\n"
         f"Avg Pix Acc Test: {avg_pixel_accuracy_test:.4f}\n"
-        f"Avg Dice Coeff Test: {avg_dice_coefficient_test:.4f}\n"
+        f"Avg Precision Test: {avg_precision_test:.4f}\n"
+        f"Avg Recall Test: {avg_recall_test:.4f}\n"
         f"Avg F1 Test: {avg_f1_test:.4f}\n"
         f"{'-'*50}"
         )

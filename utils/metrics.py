@@ -13,7 +13,7 @@ def calculate_metrics(pred_mask: Any, true_mask: Any) -> torch.Tensor:
     '''
     Calculate Metrics
 
-    Metrics : IOU, Dice score, Pixel Accuracy, Precision, Recall, F1 score.
+    Metrics : IOU, Pixel Accuracy, Precision, Recall, F1 score.
     '''
     pred_mask = pred_mask.view(-1).float()
     true_mask = true_mask.view(-1).float()
@@ -26,10 +26,9 @@ def calculate_metrics(pred_mask: Any, true_mask: Any) -> torch.Tensor:
     tn = torch.sum((1 - pred_mask) * (1 - true_mask))  # TN   
 
     iou = (tp + eps) / (tp + fp + fn + eps) 
-    dice = (2 * tp + eps) / (2 * tp + fp + fn + eps)
     pixel_acc = (tp + tn + eps) / (tp + tn + fp + fn + eps)
     precision = (tp + eps) / (tp + fp + eps)
     recall = (tp + eps) / (tp + fn + eps)
-    f1 = ((precision * recall + eps)/(precision + recall + eps))
+    f1 = 2*((precision * recall + eps)/(precision + recall + eps))
 
-    return iou.item(), dice.item(), pixel_acc.item(), f1.item()
+    return iou.item(), pixel_acc.item(), precision.item(), recall.item(), f1.item()

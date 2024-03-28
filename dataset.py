@@ -23,8 +23,8 @@ class SatelliteDataset(Dataset):
         self.data_dir = data_dir
         self.image_dir = os.path.join(data_dir, "Image")
         self.mask_dir = os.path.join(data_dir, "Mask")
-        self.image_list = pad_crop(read_envi_file(self.image_dir, True, 'dynamic_world_norm'), 224)
-        self.mask_list = pad_crop(read_envi_file(self.mask_dir, True, 'mask_norm'), 224)
+        self.image_list = pad_crop(read_envi_file(self.image_dir, True, 'dynamic_world_norm'), 480)
+        self.mask_list = pad_crop(read_envi_file(self.mask_dir, True, 'mask_norm'), 480)
         self.split = split
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
@@ -42,7 +42,7 @@ class SatelliteDataset(Dataset):
                 pass
             else:
                 indices.append(num)    
-            if cnt == 200:
+            if cnt == 100:
                 break
 
         num_samples = len(indices)

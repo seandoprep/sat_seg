@@ -102,3 +102,44 @@ class TverskyLoss(nn.Module):
         Tversky = (TP + SMOOTH) / (TP + alpha*FP + beta*FN + SMOOTH)  
         
         return 1 - Tversky
+    
+
+class ShapeConstrainedLoss(nn.Module):
+    def __init__(self) -> None:
+        super(ShapeConstrainedLoss, self).__init__()
+    '''
+    Idea from : https://www.mdpi.com/2072-4292/14/5/1249
+    '''
+
+    def forward(self, pred_mask: Any, true_mask: Any, 
+                e_pred_mask : Any, e_true_mask : Any,
+                d_pred_mask : Any, d_true_mask : Any,
+                alpha : float, beta : float) -> torch.Tensor:
+        
+        #flatten label and prediction tensors
+        pred_mask = pred_mask.view(-1).float()
+        true_mask = true_mask.view(-1).float()
+        e_pred_mask = e_pred_mask.view(-1).float()
+        e_true_mask = e_true_mask.view(-1).float()
+        d_pred_mask = d_pred_mask.view(-1).float()
+        d_true_mask = d_true_mask.view(-1).float()
+
+        # Segmentation Loss
+        def jaccard(pred, true):
+            intersection = torch.sum(true * pred)
+            union = torch.sum(true) + torch.sum(pred) - intersection
+            jac = (intersection + SMOOTH) / (union + SMOOTH)
+            return jac
+        
+        bce = F.binary_cross_entropy(pred_mask, true_mask, reduction='mean')
+        jac = jaccard(pred_mask, true_mask)
+        l_seg = bce + jac
+        
+        # Shape Loss
+        l_shp = F.binary_cross_entropy(e_pred_mask, e_true_mask, reduction='mean') + jaccard(e_pred_mask, e_true_mask)
+        l_rec = F.mse_loss(d_pred_mask, d_true_mask)
+
+        # Shape Constrained Loss
+        l_shape = l_seg + alpha*l_shp + beta*l_rec
+
+        return l_shape
