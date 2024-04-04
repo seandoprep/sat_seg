@@ -4,7 +4,8 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import torch
 import numpy as np
 import random
-import spectral.io.envi as envi 
+import spectral.io.envi as envi
+import cv2
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -180,6 +181,20 @@ def read_envi_file(img_path, norm = True, norm_type = 'linear_norm'):
     return np.array(envi_data)
 
 
+def remove_noise(binary_image, opening_kernel_size=(3, 3), closing_kernel_size=(3, 3), opening_iterations=1, closing_iterations=1):
+    # Define the structuring elements for morphological operations
+    opening_kernel = np.ones(opening_kernel_size, np.uint8)
+    closing_kernel = np.ones(closing_kernel_size, np.uint8)
+    
+    # Apply morphological opening operation
+    opening = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, opening_kernel, iterations=opening_iterations)
+    
+    # Apply morphological closing operation
+    closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, closing_kernel, iterations=closing_iterations)
+    
+    return closing
+
+
 def find_arrays_with_object(arrays_list):
     indices_with_one = [index for index, array in enumerate(arrays_list) if np.any(array > 0)]
 
@@ -214,3 +229,7 @@ def gpu_test():
         print('CUDA is currently available')
     else: 
         print('CUDA is currently unavailable')
+
+
+def count_parameters(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)

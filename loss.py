@@ -115,12 +115,12 @@ class ShapeConstrainedLoss(nn.Module):
                 e_pred_mask : Any, e_true_mask : Any,
                 d_pred_mask : Any, d_true_mask : Any,
                 alpha : float, beta : float) -> torch.Tensor:
-        
+
         #flatten label and prediction tensors
         pred_mask = pred_mask.view(-1).float()
         true_mask = true_mask.view(-1).float()
         e_pred_mask = e_pred_mask.view(-1).float()
-        e_true_mask = e_true_mask.view(-1).float()
+        e_true_mask = e_true_mask.contiguous().view(-1).float()
         d_pred_mask = d_pred_mask.view(-1).float()
         d_true_mask = d_true_mask.view(-1).float()
 
@@ -136,10 +136,13 @@ class ShapeConstrainedLoss(nn.Module):
         l_seg = bce + jac
         
         # Shape Loss
-        l_shp = F.binary_cross_entropy(e_pred_mask, e_true_mask, reduction='mean') + jaccard(e_pred_mask, e_true_mask)
-        l_rec = F.mse_loss(d_pred_mask, d_true_mask)
+        l_shp = F.mse_loss(e_pred_mask, e_true_mask) + F.mse_loss(d_pred_mask, d_true_mask)
 
         # Shape Constrained Loss
-        l_shape = l_seg + alpha*l_shp + beta*l_rec
+        l_shape = alpha*l_seg + beta*l_shp
+        
+        print('Segmentation Loss : ', str(l_seg.item()))
+        print('Shape Loss : ', str(l_shp.item()))
+        print('Shape Constrained Loss : ', str(l_shape.item()))
 
         return l_shape

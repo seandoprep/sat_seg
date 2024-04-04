@@ -21,16 +21,15 @@ from models.deeplabv3plus import DeepLabV3Plus
 from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
 from models.mdoaunet import MDOAU_net
-from models.fsnet import FSNet
 
 from loss import DiceLoss, DiceBCELoss, IoULoss, FocalLoss, TverskyLoss, ShapeConstrainedLoss
-from utils.util import gpu_test, set_seed
+from utils.util import gpu_test, set_seed, count_parameters
 from utils.metrics import calculate_metrics
 from utils.visualize import visualize_training_log, visualize_train
 from datetime import datetime
 from scheduler import CosineAnnealingWarmUpRestarts
 
-INPUT_CHANNEL_NUM = 5
+INPUT_CHANNEL_NUM = 3
 INPUT = (256, 256)
 CLASSES = 1  # For Binary Segmentatoin
 
@@ -41,7 +40,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-M",
     "--model-name",
     type=str,
-    default='mdoaunet',
+    default='resunetplusplus',
     help="Choose models for Binary Segmentation. unet, deeplabv3plus, resunetplusplus, and mdoaunet are now available",
 )
 @click.option(
@@ -94,6 +93,7 @@ def main(
         A.Rotate(limit=(-10, 10), p=0.7),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
+        #A.GaussNoise(p=0.5),
         ToTensorV2(),
     ])
 
@@ -115,19 +115,24 @@ def main(
     # Defining Model(Only channel 1 or 3 img data can be used)
     if model_name == 'unet':
         model = UNet(in_channels=INPUT_CHANNEL_NUM, num_classes=CLASSES)
+        print("Model : U-Net")
     elif model_name == 'deeplabv3plus':
         model = DeepLabV3Plus(num_classes=CLASSES)
+        print("Model : DeepLabV3+")
     elif model_name == 'resunetplusplus':
         model = ResUnetPlusPlus(in_channels=INPUT_CHANNEL_NUM, num_classes = CLASSES)
+        print("Model : ResUNet++")
     elif model_name == 'mdoaunet':
         model = MDOAU_net(INPUT_CHANNEL_NUM, CLASSES)
-    elif model_name == 'fsnet':
-        model = FSNet(INPUT_CHANNEL_NUM, CLASSES)
+        print("Model : MDOAUNet")
 
-    # Check GPU Availability
+
+    # Check GPU Availability & Set Model
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     gpu_test()
     model.to(device)
+    num_params = count_parameters(model)
+    print("Total Parameters(M):", num_params/1000000)
 
     # Loss Function Setting
     criterion = DiceLoss()
@@ -207,12 +212,7 @@ def main(
                 
                 outputs = model(images)
 
-                ### fsnet ###
-                #outputs, encoded_pred_mask, decoded_pred_mask, encoded_true_mask, decoded_true_mask = model(images, masks)
-
-                ### fsnet ###
-
-                if epoch % 50 == 0:
+                if epoch % 20 == 0:
                     #if iter % 10 == 0:
                     visualize_train(images, outputs, masks, 
                                 img_save_path= 'outputs/train_output', 
@@ -222,8 +222,6 @@ def main(
                     #    )
 
                 t_loss = criterion(outputs, masks)
-                #t_loss = criterion(pred_mask, masks, encoded_pred_mask, encoded_true_mask,
-                #                   decoded_pred_mask, decoded_true_mask, 0.1, 0.1)
 
                 t_loss.backward()
                 optimizer.step()
@@ -282,7 +280,7 @@ def main(
                     val_loss += v_loss.item()
 
                     # Calculating metrics for Validation
-                    pred_masks = outputs > 0.5
+                    pred_masks = outputs > 0.7
                     iou_val, pixel_accuracy_val, precision_val, recall_val, f1_val = calculate_metrics(
                         pred_masks, masks
                     )

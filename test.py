@@ -31,7 +31,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-M",
     "--model-name",
     type=str,
-    default='mdoaunet',
+    default='resunetplusplus',
     help="Choose models for Binary Segmentation. unet, deeplabv3plus, resunetplusplus, and transunet are now available.",
 )
 @click.option(
@@ -72,11 +72,11 @@ def main(
 
     # Defining Model(Only channel 1 or 3 img data can be used)
     if model_name == 'unet':
-        model = UNet(in_channels=3, num_classes=CLASSES)  # Can handle 1, 3 channel img data
+        model = UNet(in_channels=INPUT_CHANNEL_NUM, num_classes=CLASSES)  # Can handle 1, 3 channel img data
     elif model_name == 'deeplabv3plus':
         model = DeepLabV3Plus(num_classes=CLASSES)  # Only handle 3 channel img data because of pretrained backbone
     elif model_name == 'resunetplusplus':
-        model = ResUnetPlusPlus(in_channels=3, num_classes = CLASSES)  # Can handle 1, 3 channel img data
+        model = ResUnetPlusPlus(in_channels=INPUT_CHANNEL_NUM, num_classes = CLASSES)  # Can handle 1, 3 channel img data
     elif model_name == 'mdoaunet':
         model = MDOAU_net(INPUT_CHANNEL_NUM, CLASSES)
 

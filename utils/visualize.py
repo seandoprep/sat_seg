@@ -130,8 +130,10 @@ def visualize_training_log(training_logs_csv: str, img_save_path: str):
     IoU_val = training_log['Avg IoU Val']
     pixacc_train = training_log['Avg Pix Acc Train']
     pixacc_val = training_log['Avg Pix Acc Val']
-    dice_train = training_log['Avg Dice Coeff Train']
-    dice_val = training_log['Avg Dice Coeff Val']
+    precision_train = training_log['Avg Precision Train']
+    precision_val = training_log['Avg Precision Val']
+    recall_train = training_log['Avg Recall Train']
+    recall_val = training_log['Avg Recall Val']
     f1_train = training_log['Avg F1 Train']
     f1_val = training_log['Avg F1 Val']
     lr = training_log['Learning Rate']
@@ -165,17 +167,26 @@ def visualize_training_log(training_logs_csv: str, img_save_path: str):
     plt.ylabel('pixacc')
     plt.legend(('val', 'train'))
 
-    # Dice score
+    # Precision
     plt.subplot(2, 3, 4)
-    plt.plot(epochs, dice_train)
-    plt.plot(epochs, dice_val)
-    plt.title('Train/Val dice')
+    plt.plot(epochs, precision_train)
+    plt.plot(epochs, precision_val)
+    plt.title('Train/Val precision')
     plt.xlabel('epochs')
-    plt.ylabel('dice')
+    plt.ylabel('precision')
     plt.legend(('val', 'train'))
 
-    # Learning rate
+    # Recall
     plt.subplot(2, 3, 5)
+    plt.plot(epochs, recall_train)
+    plt.plot(epochs, recall_val)
+    plt.title('Train/Val recall')
+    plt.xlabel('epochs')
+    plt.ylabel('recall')
+    plt.legend(('val', 'train'))
+
+    # f1 score
+    plt.subplot(2, 3, 6)
     plt.plot(epochs, f1_train)
     plt.plot(epochs, f1_val)
     plt.title('Train/Val F1')
@@ -183,12 +194,6 @@ def visualize_training_log(training_logs_csv: str, img_save_path: str):
     plt.ylabel('f1')
     plt.legend(('val', 'train'))
 
-    # Learning rate
-    plt.subplot(2, 3, 6)
-    plt.plot(epochs, lr)
-    plt.title('Learning rate')
-    plt.xlabel('epochs')
-    plt.ylabel('learning_rate')
 
     plt.savefig(os.path.join(img_save_path, 'Training_log.png'))
     plt.close()

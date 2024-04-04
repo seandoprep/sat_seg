@@ -8,6 +8,7 @@ import albumentations as A
 import numpy as np
 import torch.nn.functional as F
 import xarray as xr
+import netCDF4 as nc 
 
 from tqdm import tqdm
 from albumentations.pytorch import ToTensorV2
@@ -17,10 +18,12 @@ from models.unet import UNet
 from models.resunetplusplus import ResUnetPlusPlus
 from models.mdoaunet import MDOAU_net
 from dataset import InferenceDataset
-from utils.util import set_seed, gpu_test, unpad, read_envi_file, restore_img
+from utils.util import set_seed, gpu_test, unpad, read_envi_file, restore_img, remove_noise
+from utils.save_data import save_nc, label_binary_image, create_polygon_shapefile
 from utils.visualize import compare_result
 from datetime import datetime
 from PIL import Image
+
 Image.MAX_IMAGE_PIXELS = None
 
 
@@ -35,7 +38,7 @@ CLASSES = 1  # For Binary Segmentatoin
     "-M",
     "--model-name",
     type=str,
-    default='mdoaunet',
+    default='resunetplusplus',
     help="Choose models for Binary Segmentation. unet, deeplabv3plus, resunetplusplus, and transunet are now available.",
 )
 @click.option(
@@ -125,7 +128,7 @@ def main(
 
             outputs = model(images)
             
-            pred_mask_binary = F.sigmoid(outputs[0].squeeze()) > 0.5
+            pred_mask_binary = F.sigmoid(outputs[0].squeeze()) > 0.7
             pred_mask_np = pred_mask_binary.cpu().detach().numpy()
             pred_mask_np = unpad(pred_mask_np, pad_length)
             image_list.append(pred_mask_np)
@@ -137,18 +140,24 @@ def main(
     img.save((os.path.join(inference_output_dir, 'Inference_output.jpg')), 'JPEG')
 
     # Save into NC images
-    #lon = np.arange(127.901,129.106, (129.106-127.901)/10983)
-    #lat = np.arange(34.253,35.238, (35.238-34.253)/13415)
-    #latitude = xr.DataArray(lat, dims='lat', attrs={'units': 'degrees_north'})
-    #longitude = xr.DataArray(lon, dims='lon', attrs={'units': 'degrees_east'})
-    #restored_np = np.array(restored, np.int64)
+    click.secho(message="🔎 Save into .nc format data...", fg="green")
+    
+    original_array_path = 'data\Train\ENVI\original_nc\Final_Images_msk.nc'
+    fdata = nc.Dataset(original_array_path)
+    lat_grid = np.array(fdata['lat'][:])
+    lon_grid = np.array(fdata['lon'][:])
+    save_nc(inference_output_dir, restored_img, lat_grid, lon_grid)
 
-    #df = xr.DataArray(restored_np, dims=('lat', 'lon'))
-    #df = df.assign_coords(lat=latitude, lon=longitude)
-    #inference_ds = xr.Dataset({'infernece' : df})
-    #inference_ds.to_netcdf((os.path.join(inference_output_dir,'inference.nc')))
+    # Save into shapefile
+    click.secho(message="🔎 Save into .shp format data...", fg="green")
+
+    labeled_image = label_binary_image(restored_img)
+    morphed_img = remove_noise(labeled_image)
+    output_shapefile = os.path.join(inference_output_dir, 'Inference_output.shp')
+    create_polygon_shapefile(morphed_img, output_shapefile, lat_grid, lon_grid)
 
     # Compare Images
+    click.secho(message="🔎 Comparing Images...", fg="green")
     prediction_path = os.path.join(inference_output_dir, 'Inference_output.jpg')
 
     prediction = Image.open(prediction_path)
@@ -162,8 +171,7 @@ def main(
     img = Image.fromarray(img_np)
     img.save((os.path.join(inference_output_dir, 'Compare_output.jpg')), 'JPEG')
 
-
-    click.secho(message="🎉 Inference and Comparison Done!", fg="blue")
+    click.secho(message="🎉 Inference Done!", fg="blue")
     return
 
 if __name__ == "__main__":
