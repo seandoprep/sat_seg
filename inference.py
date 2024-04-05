@@ -19,7 +19,7 @@ from models.resunetplusplus import ResUnetPlusPlus
 from models.mdoaunet import MDOAU_net
 from dataset import InferenceDataset
 from utils.util import set_seed, gpu_test, unpad, read_envi_file, restore_img, remove_noise
-from utils.save_data import save_nc, label_binary_image, create_polygon_shapefile
+from utils.save_data import save_nc, label_binary_image, mask_to_polygons
 from utils.visualize import compare_result
 from datetime import datetime
 from PIL import Image
@@ -128,20 +128,20 @@ def main(
 
             outputs = model(images)
             
-            pred_mask_binary = F.sigmoid(outputs[0].squeeze()) > 0.7
+            pred_mask_binary = F.sigmoid(outputs[0].squeeze()) > 0.5
             pred_mask_np = pred_mask_binary.cpu().detach().numpy()
             pred_mask_np = unpad(pred_mask_np, pad_length)
             image_list.append(pred_mask_np)
 
     # Restore Images
     restored = restore_img(image_list, image_height, image_width, 224)
-    restored_img = np.array(restored, np.uint8) * 255
-    img = Image.fromarray(restored_img)
+    restored_img = np.array(restored, np.uint8) 
+    img = Image.fromarray((restored_img*255))
     img.save((os.path.join(inference_output_dir, 'Inference_output.jpg')), 'JPEG')
 
     # Save into NC images
     click.secho(message="🔎 Save into .nc format data...", fg="green")
-    
+
     original_array_path = 'data\Train\ENVI\original_nc\Final_Images_msk.nc'
     fdata = nc.Dataset(original_array_path)
     lat_grid = np.array(fdata['lat'][:])
@@ -151,18 +151,18 @@ def main(
     # Save into shapefile
     click.secho(message="🔎 Save into .shp format data...", fg="green")
 
-    labeled_image = label_binary_image(restored_img)
-    morphed_img = remove_noise(labeled_image)
+    morphed_img = remove_noise(restored_img)
+    labeled_image = label_binary_image(morphed_img)
     output_shapefile = os.path.join(inference_output_dir, 'Inference_output.shp')
-    create_polygon_shapefile(morphed_img, output_shapefile, lat_grid, lon_grid)
+    mask_to_polygons(labeled_image, output_shapefile, lon_grid, lat_grid)
 
     # Compare Images
     click.secho(message="🔎 Comparing Images...", fg="green")
-    prediction_path = os.path.join(inference_output_dir, 'Inference_output.jpg')
 
+    prediction_path = os.path.join(inference_output_dir, 'Inference_output.jpg')
     prediction = Image.open(prediction_path)
     prediction_np = np.array(prediction)
-
+    
     true_mask_path = 'data\Train\ENVI\Mask'
     true_mask_np = read_envi_file(true_mask_path, None, None)
 

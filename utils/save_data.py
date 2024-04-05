@@ -4,8 +4,11 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import numpy as np
 import fiona
 import netCDF4 as nc 
+import cv2
 
 from shapely.geometry import Polygon, mapping
+from collections import defaultdict
+from shapely import MultiPolygon
 from netCDF4 import Dataset
 
 
@@ -92,37 +95,48 @@ def label_binary_image(binary_array : np.array):
                 propagate_label(x, y)
                 label += 1
 
-    return labeled_image
+    return np.array(labeled_image)
 
 
-def create_polygon_shapefile(labeled_image, output_shapefile, lat_grid, lon_grid):
-    # Define the schema for the Shapefile
+def mask_to_polygons(mask, output_shapefile, lon_grid, lat_grid, epsilon=10., min_area=20.):
+    """Convert a mask ndarray (binarized image) to Multipolygons"""
+    # first, find contours with cv2: it's much faster than shapely
+    contours, hierarchy = cv2.findContours(mask,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
+    if not contours:
+        return MultiPolygon()
+    # now messy stuff to associate parent and child contours
+    cnt_children = defaultdict(list)
+    child_contours = set()
+    assert hierarchy.shape[0] == 1
+    # http://docs.opencv.org/3.1.0/d9/d8b/tutorial_py_contours_hierarchy.html
+    for idx, (_, _, _, parent_idx) in enumerate(hierarchy[0]):
+        if parent_idx != -1:
+            child_contours.add(idx)
+            cnt_children[parent_idx].append(contours[idx])
+
+    # create actual polygons filtering by area (removes artifacts)
+    all_polygons = []
+    for idx, cnt in enumerate(contours):
+        coords = []
+        if idx not in child_contours and cv2.contourArea(cnt) >= min_area:
+            for point in cnt:
+                coord = [lon_grid[point[0][0]-1], lat_grid[point[0][1]-1]]
+                coords.append(coord)
+            poly = [coords]
+            print(poly)
+            all_polygons.append(poly)
+
     schema = {
-        'geometry': 'Polygon',
-        'properties': {'label': 'int'}
+        'geometry': 'MultiPolygon',
+        'properties' : {}
     }
 
     # Create the Shapefile with the defined schema
-    with fiona.open(output_shapefile, 'w', 'ESRI Shapefile', schema) as output:
-        height, width = len(lat_grid), len(lon_grid)
+    with fiona.open(output_shapefile, 'w', 'ESRI Shapefile', schema, crs = "EPSG:4326") as output:
+        # Write to Shapefile
+        output.write({
+            'geometry': {'type' : 'MultiPolygon', 'coordinates' : all_polygons},
+            'properties' : {}
+        })
 
-        # Iterate through the labeled image and create polygons
-        for lat in range(lat_grid):
-            for lon in range(lon_grid):
-                label = labeled_image[lat][lon]
-                if label != 0:  # Skip unlabeled pixels
-                    # Define the coordinates of the polygon
-                    # Assuming each pixel represents a square of unit size
-                    x_min = lon
-                    y_min = height - lat - 1  # Flip y-coordinate to match image coordinate system
-                    x_max = lon + 1
-                    y_max = y_min + 1
-
-                    # Create a Shapely Polygon object
-                    polygon = Polygon([(x_min, y_min), (x_min, y_max), (x_max, y_max), (x_max, y_min)])
-
-                    # Add the polygon to the Shapefile with its label as a property
-                    output.write({
-                        'geometry': mapping(polygon),
-                        'properties': {'label': label}
-                    })
+    return 
