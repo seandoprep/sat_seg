@@ -1,5 +1,6 @@
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
 import sys
 import torch
 import click
@@ -7,7 +8,6 @@ import traceback
 import albumentations as A
 import numpy as np
 import torch.nn.functional as F
-import xarray as xr
 import netCDF4 as nc 
 
 from tqdm import tqdm
@@ -19,7 +19,7 @@ from models.resunetplusplus import ResUnetPlusPlus
 from models.mdoaunet import MDOAU_net
 from dataset import InferenceDataset
 from utils.util import set_seed, gpu_test, unpad, read_envi_file, restore_img, remove_noise
-from utils.save_data import save_nc, label_binary_image, mask_to_polygons
+from utils.save_data import save_nc, label_binary_image, mask_to_boundary, mask_to_hexogon
 from utils.visualize import compare_result
 from datetime import datetime
 from PIL import Image
@@ -61,11 +61,11 @@ def main(
     model_path : str,
     batch_size : int) -> None:
     """
-    Inference & Comapring Script for DeepLabV3+ with ResNet50 Encoder for Binary Segmentation.\n
-    Please make sure your evaluation data is structured according to the folder structure specified in the Github Repository.\n
-    See: https://github.com/mukund-ks/DeepLabV3Plus-PyTorch
+    Inference Script for Binary Segmentation.
+    Please make sure your data is structured according to the folder structure specified in the Github Repository.
+    Reference : https://github.com/mukund-ks/DeepLabV3Plus-PyTorch
 
-    Refer to the Option(s) below for usage.
+    Refer to the Options below for usage.
     """
     click.secho(message="🔎 Inference...", fg="blue")
 
@@ -84,8 +84,7 @@ def main(
         click.secho(message=traceback.format_exc(), fg="yellow")
         sys.exit("Non-Existent Data Dir")
 
-
-    # Defining Model(Only channel 1 or 3 img data can be used)
+    # Defining Model
     if model_name == 'unet':
         model = UNet(in_channels=INPUT_CHANNEL_NUM, num_classes=CLASSES)  # Can handle 1, 3 channel img data
     elif model_name == 'deeplabv3plus':
@@ -133,30 +132,49 @@ def main(
             pred_mask_np = unpad(pred_mask_np, pad_length)
             image_list.append(pred_mask_np)
 
-    # Restore Images
+    # Restore Images  
+    click.secho(message="🔎 Restoring data...", fg="green")
+
     restored = restore_img(image_list, image_height, image_width, 224)
     restored_img = np.array(restored, np.uint8) 
     img = Image.fromarray((restored_img*255))
-    img.save((os.path.join(inference_output_dir, 'Inference_output.jpg')), 'JPEG')
+
+    # Save into JPG images
+    click.secho(message="🔎 Save into .jpg format data...", fg="green")
+
+    jpg_path = os.path.join(inference_output_dir, 'Inference_output.jpg')
+    img.save((jpg_path), 'JPEG')
 
     # Save into NC images
     click.secho(message="🔎 Save into .nc format data...", fg="green")
+    original_array_path = 'data\Train\ENVI\original_nc\Final_Images_msk.nc'  # Need Original Data for adding coordinate information
+    nc_path = os.path.join(inference_output_dir, 'Inference_output.nc')
 
-    original_array_path = 'data\Train\ENVI\original_nc\Final_Images_msk.nc'
     fdata = nc.Dataset(original_array_path)
     lat_grid = np.array(fdata['lat'][:])
     lon_grid = np.array(fdata['lon'][:])
-    save_nc(inference_output_dir, restored_img, lat_grid, lon_grid)
+    save_nc(nc_path, restored_img, lat_grid, lon_grid)
 
-    # Save into shapefile
-    click.secho(message="🔎 Save into .shp format data...", fg="green")
+    # Save Boundary data into Shapefile(MultiLineString)
+    click.secho(message="🔎 Save Boundary data...", fg="green")
 
     morphed_img = remove_noise(restored_img)
     labeled_image = label_binary_image(morphed_img)
-    output_shapefile = os.path.join(inference_output_dir, 'Inference_output.shp')
-    mask_to_polygons(labeled_image, output_shapefile, lon_grid, lat_grid)
+    boundary_path = os.path.join(inference_output_dir, 'Boundary.shp')
+    mask_to_boundary(labeled_image, boundary_path, lon_grid, lat_grid)
 
-    # Compare Images
+    # Save Hexagon data into Shapefile(Polygon)
+    click.secho(message="🔎 Save Hexagon data...", fg="green")
+    hexbin_path = os.path.join(inference_output_dir, 'Hexbin.shp')
+
+    mask_to_hexogon(inference_output = restored_img, 
+                    output_path = hexbin_path, 
+                    grid_size = (134, 110), 
+                    bins = [250, 500, 1000, 2500, 5000, 10000, 50000], 
+                    mincnt = 250,
+                    alpha = 0.5)
+
+    # Compare with Manual data
     click.secho(message="🔎 Comparing Images...", fg="green")
 
     prediction_path = os.path.join(inference_output_dir, 'Inference_output.jpg')

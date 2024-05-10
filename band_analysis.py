@@ -23,9 +23,9 @@ def main(
     viz_type = viz_type
     image_dir = os.path.join(data_dir, "Image")
     mask_dir = os.path.join(data_dir, "Mask")
-    band_labels = ['FAI', 'NDCI', 'NDWI']
+    band_labels = ['NDWI', 'FAI', 'NDCI']
 
-    set_seed(99)
+    set_seed(80)
 
     if viz_type == 'cropped':
         # Read Image, Mask
@@ -119,8 +119,6 @@ def main(
     plt.show()
     click.secho(message="🚀 End Visualizing...", fg="red", nl=True)
     plt.close()
-
-
 
 
 if __name__ == "__main__":

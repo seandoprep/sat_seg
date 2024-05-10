@@ -1,5 +1,6 @@
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
 import numpy as np
 import torchvision.transforms as transforms
 
@@ -29,12 +30,13 @@ class SatelliteDataset(Dataset):
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
         self.transform = transform
-
+        
+        # Data sampling
         #num_samples = len(self.image_list)
         #indices = list(range(num_samples))
-
         indices = find_arrays_with_object(self.mask_list)
         
+        # Add Non-aquaculture data
         cnt = 0
         for num in range(len(self.image_list)):   
             cnt += 1 
@@ -121,46 +123,3 @@ class InferenceDataset(Dataset):
             processed_mask = transforms.ToTensor(padded_mask)
 
         return processed_img, processed_mask
-
-
-""" if __name__ == "__main__":
-    data_dir = "./data"
-    input_size = (256, 256)
-
-    train_transform = A.Compose(
-        [
-            A.Resize(input_size[0], input_size[1]),
-            ToTensorV2(),
-        ]
-    )
-
-    val_transform = A.Compose(
-        [
-            A.Resize(input_size[0], input_size[1]),
-            ToTensorV2(),
-        ]
-    )
-
-    # Train dataset with defining split
-    #train_dataset = CustomDataset(data_dir, transformations=train_transform, split="train")
-    #train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-
-    # Validation dataset with defining split
-    #val_dataset = CustomDataset(data_dir, transformations=val_transform, split="val")
-    #val_dataloader = DataLoader(val_dataset, batch_size=4, shuffle=False)
-
-    # for images, masks in train_dataloader:
-    #     # Use the train data here for training
-    #     print(f"Image: {images.shape}")
-    #     print(f"Mask: {masks.shape}")
-
-    # Train dataset with pre-split
-    split_train = SatelliteDataset(data_dir="./data/Train", pre_split=True)
-    split_train_loader = DataLoader(split_train, batch_size=4, shuffle=False)
-
-    # Test dataset with pre-split
-    split_test = SatelliteDataset(data_dir="./data/Val", pre_split=True)
-    split_test_loader = DataLoader(split_train, batch_size=4, shuffle=False)
-
-    print(split_train.__len__())
-    print(split_test.__len__()) """

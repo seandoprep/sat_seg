@@ -20,7 +20,7 @@ def visualize_train(
         iter : str,
         ) -> None:
     '''
-    Visualize training process per epoch and Save it.
+    Visualize training process per epoch and Save it(For 3 band data).
     '''
     original_img_cpu = original_img[0].cpu().numpy()
     pred_mask_binary = F.sigmoid(pred_mask[0, 0]) > 0.5
@@ -32,21 +32,19 @@ def visualize_train(
     pred = np.expand_dims(pred, axis=2)
     true = true_mask[0].cpu().detach().numpy()
 
-    #print("\nPrediction : \n", pred)
-
     plt.figure(figsize=(28,16))
 
-    # 
+    # Band 1
     plt.subplot(2, 3, 1)
     plt.imshow(band_1, cmap='gray')
     plt.title('Band 1')
 
-    # 
+    # Band 2
     plt.subplot(2, 3, 2)
     plt.imshow(band_2, cmap='gray')
     plt.title('Band 2')
 
-    # Pixel accuracy
+    # Band 3
     plt.subplot(2, 3, 3)
     plt.imshow(band_3, cmap='gray')
     plt.title('Band 3')
@@ -73,7 +71,7 @@ def visualize_test(
         num : int
         ) -> None:
     '''
-    Visualize test process per image and Save it.
+    Visualize test process per image and Save it(For 3 band data).
     '''
     original_img_cpu = original_img[0].cpu().numpy()
     pred_mask_binary = F.sigmoid(pred_mask[0, 0]) > 0.5
@@ -89,17 +87,17 @@ def visualize_test(
 
     plt.figure(figsize=(28,16))
 
-    # 
+    # Band 1
     plt.subplot(2, 3, 1)
     plt.imshow(band_1, cmap='gray')
     plt.title('Band 1')
 
-    # 
+    # Band 2
     plt.subplot(2, 3, 2)
     plt.imshow(band_2, cmap='gray')
     plt.title('Band 2')
 
-    # Pixel accuracy
+    # Band 3
     plt.subplot(2, 3, 3)
     plt.imshow(band_3, cmap='gray')
     plt.title('Band 3')

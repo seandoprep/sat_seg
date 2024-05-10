@@ -46,11 +46,11 @@ def main(
     model_name : str,
     model_path : str) -> None:
     """
-    Test Script for DeepLabV3+ with ResNet50 Encoder for Binary Segmentation.\n
-    Please make sure your evaluation data is structured according to the folder structure specified in the Github Repository.\n
-    See: https://github.com/mukund-ks/DeepLabV3Plus-PyTorch
+    Test Script for Binary Segmentation.
+    Please make sure your data is structured according to the folder structure specified in the Github Repository.
+    Reference : https://github.com/mukund-ks/DeepLabV3Plus-PyTorch
 
-    Refer to the Option(s) below for usage.
+    Refer to the Options below for usage.
     """
     click.secho(message="🔎 Evaluation...", fg="blue")
 
@@ -70,7 +70,7 @@ def main(
         sys.exit("Non-Existent Data Dir")
 
 
-    # Defining Model(Only channel 1 or 3 img data can be used)
+    # Defining Model
     if model_name == 'unet':
         model = UNet(in_channels=INPUT_CHANNEL_NUM, num_classes=CLASSES)  # Can handle 1, 3 channel img data
     elif model_name == 'deeplabv3plus':

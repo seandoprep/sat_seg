@@ -3,12 +3,13 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 import numpy as np
 import fiona
-import netCDF4 as nc 
 import cv2
+import geopandas as gpd
+import matplotlib.pyplot as plt
 
-from shapely.geometry import Polygon, mapping
 from collections import defaultdict
-from shapely import MultiPolygon
+from shapely import MultiLineString
+from shapely.geometry import Polygon
 from netCDF4 import Dataset
 
 
@@ -20,7 +21,6 @@ def save_nc(save_path : str, prediction_array : np.array, lat_grid : np.array, l
     original_array_path : Original nc file for geocoordinate information
     prediction_array : Numpy array that needs to be converted
     '''
-    save_path = os.path.join(save_path, 'Inference_output.nc')
     height, width = prediction_array.shape
 
     # Set NC file
@@ -53,14 +53,18 @@ def save_nc(save_path : str, prediction_array : np.array, lat_grid : np.array, l
 
 
 def label_binary_image(binary_array : np.array):
+    """Label mask ndarray(binarized image) for grouping pixel"""
     height, width = binary_array.shape
     labeled_image = [[0 for _ in range(width)] for _ in range(height)]
     label = 1
 
-    # 8-directional movement offsets
-    offsets = [(-1, -1), (-1, 0), (-1, 1),
-               (0, -1),           (0, 1),
-               (1, -1), (1, 0), (1, 1)]
+    # 8-directional movement offsets(5 x 5)
+    offsets = [(-2,-2), (-2, -1), (-2, 0), (-2, 1), (-2, 2),
+               (-1,-2), (-1, -1), (-1, 0), (-1, 1), (-1, 2),
+               (0,-2),  (0, -1),           (0, 1),  (0, 2),
+               (1,-2),  (1, -1),  (1, 0),  (1, 1),  (1, 2),
+               (2,-2),  (2, -1),  (2, 0),  (2, 1),  (2, 2)]
+    
 
     # Function to check if a pixel is within the image bounds
     def is_valid_pixel(x, y):
@@ -98,45 +102,70 @@ def label_binary_image(binary_array : np.array):
     return np.array(labeled_image)
 
 
-def mask_to_polygons(mask, output_shapefile, lon_grid, lat_grid, epsilon=10., min_area=20.):
-    """Convert a mask ndarray (binarized image) to Multipolygons"""
-    # first, find contours with cv2: it's much faster than shapely
+def mask_to_boundary(mask, output_shapefile, lon_grid, lat_grid, min_area=20.):
+    """Convert a mask ndarray(binarized image) to MultiLineString"""
+    # Find contours with cv2: it's much faster than shapely
     contours, hierarchy = cv2.findContours(mask,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_NONE)
     if not contours:
-        return MultiPolygon()
-    # now messy stuff to associate parent and child contours
+        return MultiLineString()
     cnt_children = defaultdict(list)
     child_contours = set()
     assert hierarchy.shape[0] == 1
-    # http://docs.opencv.org/3.1.0/d9/d8b/tutorial_py_contours_hierarchy.html
+
     for idx, (_, _, _, parent_idx) in enumerate(hierarchy[0]):
         if parent_idx != -1:
             child_contours.add(idx)
             cnt_children[parent_idx].append(contours[idx])
 
-    # create actual polygons filtering by area (removes artifacts)
-    all_polygons = []
+    # Create actual polygons filtering by area (removes artifacts)
+    boundaries = ()
     for idx, cnt in enumerate(contours):
-        coords = []
+        coords = ()
         if idx not in child_contours and cv2.contourArea(cnt) >= min_area:
             for point in cnt:
-                coord = [lon_grid[point[0][0]-1], lat_grid[point[0][1]-1]]
-                coords.append(coord)
-            poly = [coords]
-            print(poly)
-            all_polygons.append(poly)
+                coord = (lon_grid[point[0][0]-1], lat_grid[point[0][1]-1])
+                coords = coords + (coord,)
+            boundaries = boundaries + (coords,)
 
+    # Save into MultiLineString type data
     schema = {
-        'geometry': 'MultiPolygon',
+        'geometry': 'MultiLineString',
         'properties' : {}
     }
 
-    # Create the Shapefile with the defined schema
     with fiona.open(output_shapefile, 'w', 'ESRI Shapefile', schema, crs = "EPSG:4326") as output:
-        # Write to Shapefile
         output.write({
-            'geometry': {'type' : 'MultiPolygon', 'coordinates' : all_polygons},
+            'geometry': {'type' : 'MultiLineString', 'coordinates' : boundaries},
             'properties' : {}
         })
 
     return 
+
+
+def polygons_from_hexbins(collection):
+    """Convert Matploylib PolyCollection data to Polygons"""
+    hex_polys = collection.get_paths()[0].vertices
+    hex_array = []
+    for xs,ys in collection.get_offsets():
+        hex_x = np.add(hex_polys[:,0],  xs)
+        hex_y = np.add(hex_polys[:,1],  ys)
+        hex_array.append(Polygon(np.vstack([hex_x, hex_y]).T))
+
+    color = collection.get_array()
+    return gpd.GeoDataFrame({'colors': color, 'geometry':hex_array})
+
+
+def mask_to_hexogon(inference_output, output_path, grid_size, bins, mincnt, alpha):
+    """Convert a mask ndarray(binarized image) to Hexbin plot(Polygons)"""
+    flipped_inference_output = np.flipud(inference_output)
+    aquaculture = np.where(flipped_inference_output == 1)
+
+    hb = plt.hexbin(aquaculture[1], aquaculture[0], 
+            gridsize=grid_size, 
+            cmap=plt.cm.viridis_r, 
+            bins = bins, 
+            mincnt = mincnt,
+            alpha=alpha)
+
+    hex_gdf = polygons_from_hexbins(hb)
+    hex_gdf.to_file(output_path)

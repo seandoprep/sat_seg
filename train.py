@@ -80,9 +80,9 @@ def main(
     early_stop: bool,
 ) -> None:
     """
-    Training Script for DeepLabV3+ with ResNet50 Encoder for Binary Segmentation.
+    Training Script for Binary Segmentation.
     Please make sure your data is structured according to the folder structure specified in the Github Repository.
-    See: https://github.com/mukund-ks/DeepLabV3Plus-PyTorch
+    Reference : https://github.com/mukund-ks/DeepLabV3Plus-PyTorch
 
     Refer to the Options below for usage.
     """
@@ -93,7 +93,6 @@ def main(
         A.Rotate(limit=(-10, 10), p=0.7),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        #A.GaussNoise(p=0.5),
         ToTensorV2(),
     ])
 
@@ -112,7 +111,7 @@ def main(
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
 
-    # Defining Model(Only channel 1 or 3 img data can be used)
+    # Defining Model
     if model_name == 'unet':
         model = UNet(in_channels=INPUT_CHANNEL_NUM, num_classes=CLASSES)
         print("Model : U-Net")
@@ -143,13 +142,7 @@ def main(
     #criterion = TverskyLoss()
     #criterion = ShapeConstrainedLoss()
 
-    # Optimizer & Scheduler    
-    #optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-6)
-    #scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-    #    optimizer, mode="min", patience=3, factor=0.1, verbose=True
-    #)
-    #scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)    
-
+    # Optimizer & Scheduler Setting
     optimizer = optim.Adam(model.parameters(), lr = learning_rate)
     scheduler = CosineAnnealingWarmUpRestarts(optimizer, T_0=150, T_mult=1, eta_max=0.1,  T_up=10, gamma=0.5)
 
@@ -178,7 +171,6 @@ def main(
 
     # For saving best model
     best_val_loss = float("inf")
-
     click.echo(
         f"\n{click.style(text=f'Train Size: ', fg='blue')}{train_dataset.__len__()}\t{click.style(text=f'val Size: ', fg='blue')}{val_dataset.__len__()}\n"
     )
@@ -212,14 +204,11 @@ def main(
                 
                 outputs = model(images)
 
+                # Visualize train process
                 if epoch % 20 == 0:
-                    #if iter % 10 == 0:
                     visualize_train(images, outputs, masks, 
                                 img_save_path= 'outputs/train_output', 
                                 epoch = str(epoch), iter = str(iter))
-                    #click.echo(
-                    #    f"\n{click.style(text=f'Saved Train Process', fg='green')}\t{click.style(text=f'Epoch : ', fg='green')}{str(epoch)}\t{click.style(text=f'Iter : ', fg='green')}{str(iter)}"
-                    #    )
 
                 t_loss = criterion(outputs, masks)
 

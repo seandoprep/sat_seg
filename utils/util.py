@@ -22,17 +22,10 @@ def pad_crop(original_array : np.ndarray, split_size : int):
     X_num = original_width // split_size + 1
     Y_num = original_height // split_size + 1
 
-    #print('Padding X NUM, Y NUM : ', str(X_num), str(Y_num))
-
     pad_x = (split_size * (X_num)) - original_width
     pad_y = (split_size * (Y_num)) - original_height
 
-    #print('Padding pad x, pad y : ', str(pad_x), str(pad_y))
-
     padded_array = np.pad(original_array, ((0,0),(0,pad_y),(0,pad_x)), 'constant', constant_values=0)
-
-    #print('Padding Channel : ', str(padded_array.shape[0]))
-    #print('Padding Image Shape : ', str(padded_array.shape))
 
     # Cropping
     cropped_images = []
@@ -68,16 +61,10 @@ def restore_img(image_list : list, original_height : int, original_width : int, 
     X_num = original_width // split_size + 1
     Y_num = original_height // split_size + 1
 
-    #print('Restoring X NUM, Y NUM : ', str(X_num), str(Y_num))
-
     pad_x = (split_size * (X_num)) - original_width
     pad_y = (split_size * (Y_num)) - original_height
 
-    #print('Restoring pad x, pad y : ', str(pad_x), str(pad_y))
-
     zero_array = np.zeros((original_height+pad_y, original_width+pad_x))
-
-    #print('Restoring Image Shape : ', str(zero_array.shape))
 
     for i in range(Y_num):
         for j in range(X_num):
@@ -88,14 +75,16 @@ def restore_img(image_list : list, original_height : int, original_width : int, 
             zero_array[start_y:end_y, start_x:end_x] = image_list[i * X_num + j] 
 
     restored_img = zero_array[:-pad_y, :-pad_x]
-    #print(np.array(restored_img).shape)
 
     return restored_img
 
 
 def band_norm(band : np.array, norm_type : str, value_check : bool):
     '''
-    Band Normalization for Satellite Image. 
+    Band Normalization for Satellite Image(Sentinel-1/2). 
+
+    Input : Raw band data
+    Return : Normalized band data
 
     Tips : 
     1) Negative values are changed to Positive values for deep learning training
@@ -129,7 +118,6 @@ def band_norm(band : np.array, norm_type : str, value_check : bool):
 
         band_log = np.log1p(band_abs)
         band_log_for_percentile = np.log1p(band_abs[band_abs != -np.min(band)])
-        #band_log_for_percentile = np.log1p(band_abs[band_abs != band_mean])
 
         input_band_lower_bound, input_band_upper_bound = np.percentile(band_log_for_percentile, 30), np.percentile(band_log_for_percentile, 70)  # Percentile Normalization
         input_band_range = input_band_upper_bound - input_band_lower_bound
@@ -159,6 +147,9 @@ def band_norm(band : np.array, norm_type : str, value_check : bool):
 def read_envi_file(img_path, norm = True, norm_type = 'linear_norm'):
     '''
     Read ENVI file Format and return it as numpy array type.
+
+    Input : Directory where ENVI hdr, img file exist.
+    Return : Numpy array of stacked ENVI .img data.
     '''
     hdr_files = sorted(glob(os.path.join(img_path, "*.hdr")))
     img_files = sorted(glob(os.path.join(img_path, "*.img")))
@@ -182,20 +173,33 @@ def read_envi_file(img_path, norm = True, norm_type = 'linear_norm'):
 
 
 def remove_noise(binary_image, opening_kernel_size=(3, 3), closing_kernel_size=(3, 3), opening_iterations=1, closing_iterations=1):
+    '''
+    Find Target Object.
+
+    Input : Binarized array
+    Return : Binarized array with Morpological operations(Closing, Opening)
+    '''
+
     # Define the structuring elements for morphological operations
     opening_kernel = np.ones(opening_kernel_size, np.uint8)
     closing_kernel = np.ones(closing_kernel_size, np.uint8)
     
-    # Apply morphological opening operation
-    opening = cv2.morphologyEx(binary_image, cv2.MORPH_OPEN, opening_kernel, iterations=opening_iterations)
-    
     # Apply morphological closing operation
-    closing = cv2.morphologyEx(opening, cv2.MORPH_CLOSE, closing_kernel, iterations=closing_iterations)
+    closing = cv2.morphologyEx(binary_image, cv2.MORPH_CLOSE, closing_kernel, iterations=closing_iterations)
     
-    return closing
+    # Apply morphological opening operation
+    opening = cv2.morphologyEx(closing, cv2.MORPH_OPEN, opening_kernel, iterations=opening_iterations)
+    
+    return opening
 
 
 def find_arrays_with_object(arrays_list):
+    '''
+    Find Target Object.
+
+    Input : Binarized numpy array(0 : no object, 1 : object exists)
+    Return : Indices of pixel which has value 1
+    '''
     indices_with_one = [index for index, array in enumerate(arrays_list) if np.any(array > 0)]
 
     return indices_with_one
@@ -204,6 +208,8 @@ def find_arrays_with_object(arrays_list):
 def set_seed(random_seed : int):
     '''
     Control Randomness
+
+    Input : Random seed number
     '''
     torch.manual_seed(random_seed)
     torch.cuda.manual_seed(random_seed)
@@ -211,7 +217,7 @@ def set_seed(random_seed : int):
     np.random.seed(random_seed)
     random.seed(random_seed)
 
-    #We can fully control randomness, but speed will be slow
+    # Can fully control randomness, but speed will be slow
     #torch.backends.cudnn.deterministic = True
     #torch.backends.cudnn.benchmark = False
 
@@ -232,4 +238,10 @@ def gpu_test():
 
 
 def count_parameters(model):
-        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    '''
+    Check Model Parameters
+
+    Input : DL model
+    Return : Paremeter number of input DL model
+    '''
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
