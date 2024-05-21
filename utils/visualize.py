@@ -24,38 +24,29 @@ def visualize_train(
     '''
     original_img_cpu = original_img[0].cpu().numpy()
     pred_mask_binary = F.sigmoid(pred_mask[0, 0]) > 0.5
-
-    band_1 = original_img_cpu[0,:,:] 
-    band_2 = original_img_cpu[1,:,:] 
-    band_3 = original_img_cpu[2,:,:] 
     pred = pred_mask_binary.cpu().detach().numpy()
     pred = np.expand_dims(pred, axis=2)
     true = true_mask[0].cpu().detach().numpy()
 
+    # Visuzlize
+    band_number = original_img_cpu.shape[0]
+
     plt.figure(figsize=(28,16))
 
-    # Band 1
-    plt.subplot(2, 3, 1)
-    plt.imshow(band_1, cmap='gray')
-    plt.title('Band 1')
+    for i in range(band_number):
+        band = original_img_cpu[i,:,:]
+        plt.subplot(3, 3, i+1)
+        plt.imshow(band, cmap='gray')
+        plt.title('Band {}'.format(i+1))
 
-    # Band 2
-    plt.subplot(2, 3, 2)
-    plt.imshow(band_2, cmap='gray')
-    plt.title('Band 2')
-
-    # Band 3
-    plt.subplot(2, 3, 3)
-    plt.imshow(band_3, cmap='gray')
-    plt.title('Band 3')
 
     # Prediction
-    plt.subplot(2, 3, 4)
+    plt.subplot(3, 3, band_number+1)
     plt.imshow(pred, cmap='gray')
     plt.title('Prediction')
 
     # True Mask
-    plt.subplot(2, 3, 5)
+    plt.subplot(3, 3, band_number+2)
     plt.imshow(true, cmap='gray')
     plt.title('True Mask')
 
@@ -75,40 +66,28 @@ def visualize_test(
     '''
     original_img_cpu = original_img[0].cpu().numpy()
     pred_mask_binary = F.sigmoid(pred_mask[0, 0]) > 0.5
-
-    band_1 = original_img_cpu[0,:,:] 
-    band_2 = original_img_cpu[1,:,:] 
-    band_3 = original_img_cpu[2,:,:] 
     pred = pred_mask_binary.cpu().detach().numpy()
     pred = np.expand_dims(pred, axis=2)
     true = true_mask[0].cpu().detach().numpy()
 
-    #print("\nPrediction : \n", pred)
+    # Visuzlize
+    band_number = original_img_cpu.shape[0]
 
     plt.figure(figsize=(28,16))
 
-    # Band 1
-    plt.subplot(2, 3, 1)
-    plt.imshow(band_1, cmap='gray')
-    plt.title('Band 1')
-
-    # Band 2
-    plt.subplot(2, 3, 2)
-    plt.imshow(band_2, cmap='gray')
-    plt.title('Band 2')
-
-    # Band 3
-    plt.subplot(2, 3, 3)
-    plt.imshow(band_3, cmap='gray')
-    plt.title('Band 3')
+    for i in range(band_number):
+        band = original_img_cpu[i,:,:]
+        plt.subplot(3, 3, i+1)
+        plt.imshow(band, cmap='gray')
+        plt.title('Band {}'.format(i+1))
 
     # Prediction
-    plt.subplot(2, 3, 4)
+    plt.subplot(3, 3, band_number+1)
     plt.imshow(pred, cmap='gray')
     plt.title('Prediction')
 
     # True Mask
-    plt.subplot(2, 3, 5)
+    plt.subplot(3, 3, band_number+2)
     plt.imshow(true, cmap='gray')
     plt.title('True Mask')
 
